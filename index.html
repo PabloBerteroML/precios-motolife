@@ -404,12 +404,34 @@ function leerCanvas() {
 }
 
 function leerCanvasZXing() {
-  if (!zxingReader || !zxingReader.decodeFromCanvas) return Promise.resolve('');
-  return zxingReader.decodeFromCanvas(canvasEl).then(function(result) {
-    return result ? result.getText() : '';
-  }).catch(function() {
-    return '';
-  });
+  if (!zxingReader) return Promise.resolve('');
+
+  // Algunas versiones de @zxing/browser no traen decodeFromCanvas().
+  // Si existe, lo usamos. Si no, convertimos el canvas en imagen y decodificamos esa imagen.
+  if (typeof zxingReader.decodeFromCanvas === 'function') {
+    return zxingReader.decodeFromCanvas(canvasEl).then(function(result) {
+      return result ? result.getText() : '';
+    }).catch(function() {
+      return '';
+    });
+  }
+
+  if (typeof zxingReader.decodeFromImageElement === 'function') {
+    return new Promise(function(resolve) {
+      var img = new Image();
+      img.onload = function() {
+        zxingReader.decodeFromImageElement(img).then(function(result) {
+          resolve(result ? result.getText() : '');
+        }).catch(function() {
+          resolve('');
+        });
+      };
+      img.onerror = function() { resolve(''); };
+      img.src = canvasEl.toDataURL('image/png');
+    });
+  }
+
+  return Promise.resolve('');
 }
 
 function codigoDetectado(code) {
