@@ -252,184 +252,251 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&isScanningGun){isScanningGun=false;clearTimeout(debounceTimer);search(inp.value);}
 });
 
-/* ── Cámara con canvas polling compatible iOS ── */
-var zxingReader = null;
-var zxingReadyPromise = null;
-var scanBusy = false;
+/* ── Cámara con canvas polling optimizado para iOS / códigos 1D ── */
+var zxingLibPromise = null;
+var nativeDetector = null;
+var lastDetectedCode = '';
+var lastDetectedAt = 0;
 
-function cargarZXing() {
-  if (window.ZXingBrowser) return Promise.resolve();
-
-  if (zxingReadyPromise) return zxingReadyPromise;
-
-  zxingReadyPromise = new Promise(function(resolve, reject) {
-    var existing = document.querySelector('script[data-zxing="browser"]');
+function loadScriptOnce(src, globalName) {
+  if (window[globalName]) return Promise.resolve(window[globalName]);
+  return new Promise(function(resolve, reject) {
+    var existing = document.querySelector('script[data-loader="' + globalName + '"]');
     if (existing) {
-      existing.addEventListener('load', resolve);
+      existing.addEventListener('load', function(){ resolve(window[globalName]); });
       existing.addEventListener('error', reject);
       return;
     }
-
     var script = document.createElement('script');
-    script.src = 'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js';
+    script.src = src;
     script.async = true;
-    script.setAttribute('data-zxing', 'browser');
-    script.onload = resolve;
-    script.onerror = reject;
+    script.setAttribute('data-loader', globalName);
+    script.onload = function(){ resolve(window[globalName]); };
+    script.onerror = function(){ reject(new Error('No se pudo cargar ' + src)); };
     document.head.appendChild(script);
   });
+}
 
-  return zxingReadyPromise;
+function cargarZXingLibrary() {
+  if (!zxingLibPromise) {
+    zxingLibPromise = loadScriptOnce('https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js', 'ZXing');
+  }
+  return zxingLibPromise;
 }
 
 function abrirCamara() {
   if (cameraOpen) { cerrarCamara(); return; }
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    camStatus.textContent = 'Este navegador no permite usar la cámara.';
-    return;
-  }
-
   camWrap.classList.add('open');
   camBtn.classList.add('active');
   camBtn.querySelector('i').className = 'ti ti-camera-off';
   cameraOpen = true;
   camStatus.textContent = 'Solicitando acceso a la cámara…';
 
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    camStatus.textContent = 'Este navegador no permite usar la cámara.';
+    cerrarCamara();
+    return;
+  }
+
   navigator.mediaDevices.getUserMedia({
     video: {
       facingMode: { ideal: 'environment' },
-      width: { ideal: 1280 },
-      height: { ideal: 720 }
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
     },
     audio: false
   })
   .then(function(stream) {
     activeStream = stream;
     videoEl.srcObject = stream;
+    videoEl.setAttribute('playsinline', 'true');
+    videoEl.muted = true;
 
-    return videoEl.play();
-  })
-  .then(function() {
-    camStatus.textContent = 'Preparando lector…';
-
-    // En iOS a veces videoWidth/videoHeight tardan unos frames aunque play() ya resolvió.
-    esperarVideoListo(function() {
-      iniciarScanCanvas();
-    });
+    videoEl.onloadedmetadata = function() {
+      videoEl.play().then(function() {
+        camStatus.textContent = 'Centrá el código horizontal dentro de la lÃ­nea naranja…';
+        iniciarScanCanvas();
+      }).catch(function(e) {
+        camStatus.textContent = 'Error de video: ' + e.message;
+      });
+    };
   })
   .catch(function(err) {
-    camStatus.textContent = err && err.name === 'NotAllowedError'
+    camStatus.textContent = err.name === 'NotAllowedError'
       ? 'Permiso denegado — habilitá la cámara en Ajustes > Safari.'
-      : 'Error de cámara: ' + (err && err.message ? err.message : err);
+      : 'Error: ' + err.message;
     cerrarCamara();
   });
 }
 
-function esperarVideoListo(callback) {
-  var intentos = 0;
+function prepararCanvasParaLectura() {
+  if (!videoEl.videoWidth || !videoEl.videoHeight) return false;
 
-  function check() {
-    if (!cameraOpen) return;
+  var vw = videoEl.videoWidth;
+  var vh = videoEl.videoHeight;
 
-    if (videoEl.readyState >= 2 && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
-      callback();
-      return;
+  // Para códigos de barras 1D conviene recortar una franja central horizontal.
+  // Así ZXing no pierde tiempo con toda la imagen y mejora mucho en iOS.
+  var cropX = Math.round(vw * 0.03);
+  var cropW = Math.round(vw * 0.94);
+  var cropY = Math.round(vh * 0.27);
+  var cropH = Math.round(vh * 0.46);
+
+  var maxW = 1100;
+  var scale = Math.min(1, maxW / cropW);
+  canvasEl.width = Math.round(cropW * scale);
+  canvasEl.height = Math.round(cropH * scale);
+
+  var ctx = canvasEl.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, canvasEl.width, canvasEl.height);
+
+  // Aumentar contraste ayuda cuando el código está poco iluminado o desenfocado.
+  try {
+    var img = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+    var data = img.data;
+    for (var i = 0; i < data.length; i += 4) {
+      var gray = (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+      gray = (gray - 128) * 1.45 + 128;
+      gray = Math.max(0, Math.min(255, gray));
+      data[i] = data[i+1] = data[i+2] = gray;
     }
+    ctx.putImageData(img, 0, 0);
+  } catch(e) {}
 
-    intentos++;
-    if (intentos > 80) {
-      camStatus.textContent = 'No se pudo iniciar el video. Cerrá y probá de nuevo.';
-      return;
+  return true;
+}
+
+function codigoValido(code) {
+  code = String(code || '').trim();
+  // Tus códigos parecen códigos de producto/barra. Evitamos falsos positivos muy cortos.
+  return code.length >= 5 && /^[0-9A-Z\-_.\/]+$/i.test(code);
+}
+
+function codigoDetectado(code) {
+  code = String(code || '').trim().toUpperCase();
+  if (!codigoValido(code)) return;
+
+  // Evita doble lectura del mismo frame.
+  var now = Date.now();
+  if (code === lastDetectedCode && now - lastDetectedAt < 1200) return;
+  lastDetectedCode = code;
+  lastDetectedAt = now;
+
+  inp.value = code;
+  cerrarCamara();
+  search(code);
+}
+
+function intentarBarcodeDetector() {
+  if (!('BarcodeDetector' in window)) return Promise.resolve(null);
+
+  try {
+    if (!nativeDetector) {
+      nativeDetector = new BarcodeDetector({
+        formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar']
+      });
     }
-
-    setTimeout(check, 100);
+    return nativeDetector.detect(canvasEl).then(function(results) {
+      if (results && results.length) return results[0].rawValue || null;
+      return null;
+    }).catch(function(){ return null; });
+  } catch(e) {
+    return Promise.resolve(null);
   }
+}
 
-  check();
+function crearZXingReader(ZXing) {
+  var reader = new ZXing.MultiFormatReader();
+  try {
+    var hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.UPC_A,
+      ZXing.BarcodeFormat.UPC_E,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.CODE_93,
+      ZXing.BarcodeFormat.ITF,
+      ZXing.BarcodeFormat.CODABAR
+    ]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    reader.setHints(hints);
+  } catch(e) {}
+  return reader;
+}
+
+function decodificarConZXing(ZXing, reader) {
+  try {
+    var luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvasEl);
+    var binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+    var result = reader.decode(binaryBitmap);
+    if (result && result.getText) return result.getText();
+    if (result && result.text) return result.text;
+  } catch(e1) {
+    try {
+      var luminanceSource2 = new ZXing.HTMLCanvasElementLuminanceSource(canvasEl);
+      var binaryBitmap2 = new ZXing.BinaryBitmap(new ZXing.GlobalHistogramBinarizer(luminanceSource2));
+      var result2 = reader.decode(binaryBitmap2);
+      if (result2 && result2.getText) return result2.getText();
+      if (result2 && result2.text) return result2.text;
+    } catch(e2) {}
+  } finally {
+    try { reader.reset(); } catch(e) {}
+  }
+  return null;
 }
 
 function iniciarScanCanvas() {
-  cargarZXing()
-    .then(function() {
-      if (!cameraOpen) return;
+  camStatus.textContent = 'Cargando lector de códigos…';
 
-      zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+  cargarZXingLibrary().then(function(ZXing) {
+    if (!cameraOpen) return;
+    var reader = crearZXingReader(ZXing);
+    var scanning = false;
+    var intentos = 0;
 
-      var ctx = canvasEl.getContext('2d', { willReadFrequently: true });
-      scanBusy = false;
-      camStatus.textContent = 'Apuntá al código de barras…';
+    camStatus.textContent = 'Centrá el código, acercalo y mantenelo quieto…';
 
-      scanInterval = setInterval(function() {
-        if (!cameraOpen || !activeStream || scanBusy) return;
-        if (!videoEl.videoWidth || !videoEl.videoHeight) return;
+    scanInterval = setInterval(function() {
+      if (!cameraOpen || scanning) return;
+      if (!prepararCanvasParaLectura()) return;
 
-        scanBusy = true;
+      scanning = true;
+      intentos++;
 
-        try {
-          // Bajamos el tamaño para que iOS no se ahogue procesando frames muy grandes.
-          var vw = videoEl.videoWidth;
-          var vh = videoEl.videoHeight;
-          var maxW = 960;
-          var scale = Math.min(1, maxW / vw);
-          var cw = Math.round(vw * scale);
-          var ch = Math.round(vh * scale);
-
-          canvasEl.width = cw;
-          canvasEl.height = ch;
-          ctx.drawImage(videoEl, 0, 0, cw, ch);
-
-          zxingReader.decodeFromCanvas(canvasEl)
-            .then(function(result) {
-              scanBusy = false;
-
-              if (!result) return;
-
-              var code = String(result.getText() || '').trim();
-              if (!code) return;
-
-              inp.value = code.toUpperCase();
-              camStatus.textContent = 'Código leído: ' + code;
-              cerrarCamara();
-              search(code);
-            })
-            .catch(function() {
-              // Normal: en la mayoría de los frames no hay código detectable.
-              scanBusy = false;
-            });
-        } catch(e) {
-          scanBusy = false;
+      intentarBarcodeDetector().then(function(nativeCode) {
+        if (nativeCode) {
+          scanning = false;
+          codigoDetectado(nativeCode);
+          return;
         }
-      }, 450);
-    })
-    .catch(function() {
-      camStatus.textContent = 'Error cargando lector. Tipeá el código manualmente.';
-    });
+
+        var zxingCode = decodificarConZXing(ZXing, reader);
+        scanning = false;
+        if (zxingCode) {
+          codigoDetectado(zxingCode);
+        } else if (intentos % 8 === 0) {
+          camStatus.textContent = 'No lo leo todavía. ProbÃ¡ más luz, menos reflejo y el código bien horizontal.';
+        }
+      }).catch(function() {
+        scanning = false;
+      });
+    }, 420);
+  }).catch(function() {
+    camStatus.textContent = 'Error cargando lector. Tipeá el código manualmente.';
+  });
 }
 
 function cerrarCamara() {
-  if (scanInterval) {
-    clearInterval(scanInterval);
-    scanInterval = null;
-  }
-
-  scanBusy = false;
-
-  if (zxingReader) {
-    try { zxingReader.reset(); } catch(e) {}
-    zxingReader = null;
-  }
-
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  nativeDetector = null;
   if (activeStream) {
-    try {
-      activeStream.getTracks().forEach(function(t) { t.stop(); });
-    } catch(e) {}
+    try { activeStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
     activeStream = null;
   }
-
   videoEl.pause();
   videoEl.srcObject = null;
-
   camWrap.classList.remove('open');
   camBtn.classList.remove('active');
   camBtn.querySelector('i').className = 'ti ti-camera';
