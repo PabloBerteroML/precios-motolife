@@ -209,7 +209,27 @@
 
 <footer>Precios con IVA incluido · Datos actualizados desde Google Sheets</footer>
 
-<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
+<script>
+// Carga ZXing de forma segura antes de usarlo
+var zxingReady = false;
+var zxingCallbacks = [];
+
+function onZXingReady(fn) {
+  if (zxingReady) { fn(); return; }
+  zxingCallbacks.push(fn);
+}
+
+(function() {
+  var s = document.createElement('script');
+  s.src = 'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js';
+  s.onload = function() {
+    zxingReady = true;
+    zxingCallbacks.forEach(function(fn){ fn(); });
+    zxingCallbacks = [];
+  };
+  document.head.appendChild(s);
+})();
+</script>
 <script>
 var API_URL = 'https://script.google.com/macros/s/AKfycbwFYU8jpF7mXw75TC7XbiXH6iwuy8GPz1YZEQxglY1CxcaR89voBoAYj_sjoWoEZMo/exec?action=precios';
 
@@ -318,7 +338,7 @@ function abrirCamara() {
     videoEl.onloadedmetadata = function() {
       videoEl.play().then(function() {
         camStatus.textContent = 'Apuntá la cámara al código de barras…';
-        iniciarLector();
+        onZXingReady(iniciarLector);
       }).catch(function(e) {
         camStatus.textContent = 'Error iniciando video: ' + e.message;
       });
