@@ -509,7 +509,7 @@ function showResult(item) {
 inp.addEventListener('input',function(e){clearTimeout(debounceTimer);debounceTimer=setTimeout(function(){search(e.target.value);},150);});
 inp.addEventListener('keydown',function(e){if(e.key==='Enter'){clearTimeout(debounceTimer);search(inp.value);}if(e.key==='Escape')clearAll();});
 
-/* ── Carga de datos ── */
+/* ── Carga de datos s ── */
 fetch(API_URL)
   .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
   .then(function(data){
