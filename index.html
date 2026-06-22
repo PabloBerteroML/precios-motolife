@@ -263,8 +263,7 @@ var detector = null;
 
 function cargarZXing() {
   // ZXing ya no se descarga desde CDN en runtime.
-  // Debe estar subido al repo como /vendor/zxing-browser.js y cargado con:
-  // <script src="./vendor/zxing-browser.js"></script>
+  // Debe estar subido al repo como /vendor/zxing-browser.js
   if (window.ZXingBrowser) return Promise.resolve();
   return Promise.reject(new Error('ZXing local no cargó. Verificá que exista ./vendor/zxing-browser.js'));
 }
