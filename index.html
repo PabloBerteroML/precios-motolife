@@ -252,40 +252,47 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&isScanningGun){isScanningGun=false;clearTimeout(debounceTimer);search(inp.value);}
 });
 
-/* ── Cámara con canvas polling optimizado para iOS / códigos 1D ── */
-var zxingLibPromise = null;
-var nativeDetector = null;
-var lastDetectedCode = '';
-var lastDetectedAt = 0;
+/* ── Cámara con canvas polling robusto para iOS ── */
+var zxingLoadPromise = null;
+var zxingReader = null;
+var scanBusy = false;
+var detector = null;
 
-function loadScriptOnce(src, globalName) {
-  if (window[globalName]) return Promise.resolve(window[globalName]);
-  return new Promise(function(resolve, reject) {
-    var existing = document.querySelector('script[data-loader="' + globalName + '"]');
-    if (existing) {
-      existing.addEventListener('load', function(){ resolve(window[globalName]); });
-      existing.addEventListener('error', reject);
-      return;
+function cargarZXing() {
+  if (window.ZXingBrowser) return Promise.resolve();
+  if (zxingLoadPromise) return zxingLoadPromise;
+
+  var urls = [
+    'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js',
+    'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js'
+  ];
+
+  zxingLoadPromise = new Promise(function(resolve, reject) {
+    var i = 0;
+    function probarSiguiente() {
+      if (i >= urls.length) {
+        reject(new Error('No se pudo cargar ZXing desde los CDN'));
+        return;
+      }
+      var script = document.createElement('script');
+      script.src = urls[i++];
+      script.async = true;
+      script.onload = function() {
+        if (window.ZXingBrowser) resolve();
+        else probarSiguiente();
+      };
+      script.onerror = probarSiguiente;
+      document.head.appendChild(script);
     }
-    var script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.setAttribute('data-loader', globalName);
-    script.onload = function(){ resolve(window[globalName]); };
-    script.onerror = function(){ reject(new Error('No se pudo cargar ' + src)); };
-    document.head.appendChild(script);
+    probarSiguiente();
   });
-}
 
-function cargarZXingLibrary() {
-  if (!zxingLibPromise) {
-    zxingLibPromise = loadScriptOnce('https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js', 'ZXing');
-  }
-  return zxingLibPromise;
+  return zxingLoadPromise;
 }
 
 function abrirCamara() {
   if (cameraOpen) { cerrarCamara(); return; }
+
   camWrap.classList.add('open');
   camBtn.classList.add('active');
   camBtn.querySelector('i').className = 'ti ti-camera-off';
@@ -294,27 +301,24 @@ function abrirCamara() {
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     camStatus.textContent = 'Este navegador no permite usar la cámara.';
-    cerrarCamara();
     return;
   }
 
   navigator.mediaDevices.getUserMedia({
     video: {
       facingMode: { ideal: 'environment' },
-      width: { ideal: 1920 },
-      height: { ideal: 1080 }
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
     },
     audio: false
   })
   .then(function(stream) {
     activeStream = stream;
     videoEl.srcObject = stream;
-    videoEl.setAttribute('playsinline', 'true');
-    videoEl.muted = true;
 
     videoEl.onloadedmetadata = function() {
       videoEl.play().then(function() {
-        camStatus.textContent = 'Centrá el código horizontal dentro de la lÃ­nea naranja…';
+        camStatus.textContent = 'Cámara lista. Cargando lector…';
         iniciarScanCanvas();
       }).catch(function(e) {
         camStatus.textContent = 'Error de video: ' + e.message;
@@ -324,178 +328,130 @@ function abrirCamara() {
   .catch(function(err) {
     camStatus.textContent = err.name === 'NotAllowedError'
       ? 'Permiso denegado — habilitá la cámara en Ajustes > Safari.'
-      : 'Error: ' + err.message;
-    cerrarCamara();
+      : 'Error cámara: ' + err.message;
   });
 }
 
-function prepararCanvasParaLectura() {
-  if (!videoEl.videoWidth || !videoEl.videoHeight) return false;
-
-  var vw = videoEl.videoWidth;
-  var vh = videoEl.videoHeight;
-
-  // Para códigos de barras 1D conviene recortar una franja central horizontal.
-  // Así ZXing no pierde tiempo con toda la imagen y mejora mucho en iOS.
-  var cropX = Math.round(vw * 0.03);
-  var cropW = Math.round(vw * 0.94);
-  var cropY = Math.round(vh * 0.27);
-  var cropH = Math.round(vh * 0.46);
-
-  var maxW = 1100;
-  var scale = Math.min(1, maxW / cropW);
-  canvasEl.width = Math.round(cropW * scale);
-  canvasEl.height = Math.round(cropH * scale);
-
-  var ctx = canvasEl.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, canvasEl.width, canvasEl.height);
-
-  // Aumentar contraste ayuda cuando el código está poco iluminado o desenfocado.
+function prepararBarcodeDetector() {
   try {
-    var img = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
-    var data = img.data;
-    for (var i = 0; i < data.length; i += 4) {
-      var gray = (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
-      gray = (gray - 128) * 1.45 + 128;
-      gray = Math.max(0, Math.min(255, gray));
-      data[i] = data[i+1] = data[i+2] = gray;
+    if ('BarcodeDetector' in window) {
+      detector = new BarcodeDetector({
+        formats: ['ean_13','ean_8','code_128','code_39','code_93','upc_a','upc_e','itf']
+      });
     }
-    ctx.putImageData(img, 0, 0);
-  } catch(e) {}
-
-  return true;
+  } catch(e) {
+    detector = null;
+  }
 }
 
-function codigoValido(code) {
-  code = String(code || '').trim();
-  // Tus códigos parecen códigos de producto/barra. Evitamos falsos positivos muy cortos.
-  return code.length >= 5 && /^[0-9A-Z\-_.\/]+$/i.test(code);
+function iniciarScanCanvas() {
+  prepararBarcodeDetector();
+
+  cargarZXing().then(function() {
+    try {
+      zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+      camStatus.textContent = 'Apuntá al código. Mantenelo horizontal y bien iluminado…';
+      iniciarLoopEscaneo();
+    } catch(e) {
+      camStatus.textContent = 'El lector cargó, pero no pudo iniciar: ' + e.message;
+    }
+  }).catch(function() {
+    if (detector) {
+      camStatus.textContent = 'ZXing no cargó. Probando lector nativo del navegador…';
+      iniciarLoopEscaneo();
+    } else {
+      camStatus.textContent = 'No se pudo cargar el lector. Revisá conexión/CDN o tipeá el código.';
+    }
+  });
+}
+
+function iniciarLoopEscaneo() {
+  var ctx = canvasEl.getContext('2d', { willReadFrequently: true });
+
+  scanInterval = setInterval(function() {
+    if (!cameraOpen || scanBusy || !videoEl.videoWidth || !videoEl.videoHeight) return;
+    scanBusy = true;
+
+    try {
+      var vw = videoEl.videoWidth;
+      var vh = videoEl.videoHeight;
+
+      // Para códigos de barras 1D conviene leer una franja central, no todo el video.
+      var cropX = Math.round(vw * 0.05);
+      var cropW = Math.round(vw * 0.90);
+      var cropH = Math.round(vh * 0.34);
+      var cropY = Math.round((vh - cropH) / 2);
+
+      var maxW = 900;
+      var scale = cropW > maxW ? maxW / cropW : 1;
+      canvasEl.width = Math.round(cropW * scale);
+      canvasEl.height = Math.round(cropH * scale);
+
+      ctx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, canvasEl.width, canvasEl.height);
+
+      // Aumentar contraste simple para iOS/Safari y códigos impresos con poco foco.
+      var img = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+      var data = img.data;
+      for (var i = 0; i < data.length; i += 4) {
+        var gray = (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
+        var v = gray > 145 ? 255 : 0;
+        data[i] = data[i+1] = data[i+2] = v;
+      }
+      ctx.putImageData(img, 0, 0);
+
+      leerCanvas().then(function(code) {
+        scanBusy = false;
+        if (code) codigoDetectado(code);
+      }).catch(function() {
+        scanBusy = false;
+      });
+    } catch(e) {
+      scanBusy = false;
+      camStatus.textContent = 'Error escaneando frame: ' + e.message;
+    }
+  }, 500);
+}
+
+function leerCanvas() {
+  // 1) Intentar BarcodeDetector nativo si el navegador lo trae.
+  if (detector) {
+    return detector.detect(canvasEl).then(function(codes) {
+      if (codes && codes.length && codes[0].rawValue) return codes[0].rawValue;
+      return leerCanvasZXing();
+    }).catch(function() {
+      return leerCanvasZXing();
+    });
+  }
+  return leerCanvasZXing();
+}
+
+function leerCanvasZXing() {
+  if (!zxingReader || !zxingReader.decodeFromCanvas) return Promise.resolve('');
+  return zxingReader.decodeFromCanvas(canvasEl).then(function(result) {
+    return result ? result.getText() : '';
+  }).catch(function() {
+    return '';
+  });
 }
 
 function codigoDetectado(code) {
-  code = String(code || '').trim().toUpperCase();
-  if (!codigoValido(code)) return;
-
-  // Evita doble lectura del mismo frame.
-  var now = Date.now();
-  if (code === lastDetectedCode && now - lastDetectedAt < 1200) return;
-  lastDetectedCode = code;
-  lastDetectedAt = now;
-
-  inp.value = code;
+  code = String(code || '').trim();
+  if (!code) return;
+  inp.value = code.toUpperCase();
   cerrarCamara();
   search(code);
 }
 
-function intentarBarcodeDetector() {
-  if (!('BarcodeDetector' in window)) return Promise.resolve(null);
-
-  try {
-    if (!nativeDetector) {
-      nativeDetector = new BarcodeDetector({
-        formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','code_93','itf','codabar']
-      });
-    }
-    return nativeDetector.detect(canvasEl).then(function(results) {
-      if (results && results.length) return results[0].rawValue || null;
-      return null;
-    }).catch(function(){ return null; });
-  } catch(e) {
-    return Promise.resolve(null);
-  }
-}
-
-function crearZXingReader(ZXing) {
-  var reader = new ZXing.MultiFormatReader();
-  try {
-    var hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-      ZXing.BarcodeFormat.EAN_13,
-      ZXing.BarcodeFormat.EAN_8,
-      ZXing.BarcodeFormat.UPC_A,
-      ZXing.BarcodeFormat.UPC_E,
-      ZXing.BarcodeFormat.CODE_128,
-      ZXing.BarcodeFormat.CODE_39,
-      ZXing.BarcodeFormat.CODE_93,
-      ZXing.BarcodeFormat.ITF,
-      ZXing.BarcodeFormat.CODABAR
-    ]);
-    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-    reader.setHints(hints);
-  } catch(e) {}
-  return reader;
-}
-
-function decodificarConZXing(ZXing, reader) {
-  try {
-    var luminanceSource = new ZXing.HTMLCanvasElementLuminanceSource(canvasEl);
-    var binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
-    var result = reader.decode(binaryBitmap);
-    if (result && result.getText) return result.getText();
-    if (result && result.text) return result.text;
-  } catch(e1) {
-    try {
-      var luminanceSource2 = new ZXing.HTMLCanvasElementLuminanceSource(canvasEl);
-      var binaryBitmap2 = new ZXing.BinaryBitmap(new ZXing.GlobalHistogramBinarizer(luminanceSource2));
-      var result2 = reader.decode(binaryBitmap2);
-      if (result2 && result2.getText) return result2.getText();
-      if (result2 && result2.text) return result2.text;
-    } catch(e2) {}
-  } finally {
-    try { reader.reset(); } catch(e) {}
-  }
-  return null;
-}
-
-function iniciarScanCanvas() {
-  camStatus.textContent = 'Cargando lector de códigos…';
-
-  cargarZXingLibrary().then(function(ZXing) {
-    if (!cameraOpen) return;
-    var reader = crearZXingReader(ZXing);
-    var scanning = false;
-    var intentos = 0;
-
-    camStatus.textContent = 'Centrá el código, acercalo y mantenelo quieto…';
-
-    scanInterval = setInterval(function() {
-      if (!cameraOpen || scanning) return;
-      if (!prepararCanvasParaLectura()) return;
-
-      scanning = true;
-      intentos++;
-
-      intentarBarcodeDetector().then(function(nativeCode) {
-        if (nativeCode) {
-          scanning = false;
-          codigoDetectado(nativeCode);
-          return;
-        }
-
-        var zxingCode = decodificarConZXing(ZXing, reader);
-        scanning = false;
-        if (zxingCode) {
-          codigoDetectado(zxingCode);
-        } else if (intentos % 8 === 0) {
-          camStatus.textContent = 'No lo leo todavía. ProbÃ¡ más luz, menos reflejo y el código bien horizontal.';
-        }
-      }).catch(function() {
-        scanning = false;
-      });
-    }, 420);
-  }).catch(function() {
-    camStatus.textContent = 'Error cargando lector. Tipeá el código manualmente.';
-  });
-}
-
 function cerrarCamara() {
   if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-  nativeDetector = null;
+  scanBusy = false;
+  if (zxingReader && zxingReader.reset) {
+    try { zxingReader.reset(); } catch(e) {}
+  }
   if (activeStream) {
-    try { activeStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
+    try { activeStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {}
     activeStream = null;
   }
-  videoEl.pause();
   videoEl.srcObject = null;
   camWrap.classList.remove('open');
   camBtn.classList.remove('active');
