@@ -406,25 +406,33 @@ function leerCanvas() {
 function leerCanvasZXing() {
   if (!zxingReader) return Promise.resolve('');
 
-  // Algunas versiones de @zxing/browser no traen decodeFromCanvas().
-  // Si existe, lo usamos. Si no, convertimos el canvas en imagen y decodificamos esa imagen.
+  // Compatibilidad: en algunas versiones de ZXing estos metodos devuelven Promise,
+  // y en otras devuelven el resultado en forma sincronica. Por eso envolvemos con Promise.resolve().
   if (typeof zxingReader.decodeFromCanvas === 'function') {
-    return zxingReader.decodeFromCanvas(canvasEl).then(function(result) {
-      return result ? result.getText() : '';
-    }).catch(function() {
-      return '';
-    });
+    try {
+      return Promise.resolve(zxingReader.decodeFromCanvas(canvasEl)).then(function(result) {
+        return result && typeof result.getText === 'function' ? result.getText() : '';
+      }).catch(function() {
+        return '';
+      });
+    } catch(e) {
+      return Promise.resolve('');
+    }
   }
 
   if (typeof zxingReader.decodeFromImageElement === 'function') {
     return new Promise(function(resolve) {
       var img = new Image();
       img.onload = function() {
-        zxingReader.decodeFromImageElement(img).then(function(result) {
-          resolve(result ? result.getText() : '');
-        }).catch(function() {
+        try {
+          Promise.resolve(zxingReader.decodeFromImageElement(img)).then(function(result) {
+            resolve(result && typeof result.getText === 'function' ? result.getText() : '');
+          }).catch(function() {
+            resolve('');
+          });
+        } catch(e) {
           resolve('');
-        });
+        }
       };
       img.onerror = function() { resolve(''); };
       img.src = canvasEl.toDataURL('image/png');
