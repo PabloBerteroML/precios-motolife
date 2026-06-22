@@ -53,12 +53,46 @@
   #cam-btn:hover { background:#2a2a28; }
   #cam-btn i { font-size:26px; }
   #cam-btn.active { background:var(--orange); color:#fff; }
-  #cam-reader-wrap { margin-top:14px; display:none; border:2px solid var(--orange); border-radius:16px; overflow:hidden; position:relative; }
-  #cam-reader-wrap.open { display:block; }
-  #cam-reader { width:100%; }
-  #cam-close { position:absolute; top:10px; right:10px; background:rgba(0,0,0,.55); border:none; border-radius:50%; width:36px; height:36px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#fff; z-index:10; }
+
+  /* Cámara */
+  #cam-wrap {
+    margin-top:14px; display:none; position:relative;
+    border:2px solid var(--orange); border-radius:16px; overflow:hidden;
+    background:#000;
+  }
+  #cam-wrap.open { display:block; }
+  #cam-video {
+    width:100%; display:block;
+    max-height:340px; object-fit:cover;
+  }
+  #cam-overlay {
+    position:absolute; top:0; left:0; right:0; bottom:0;
+    pointer-events:none;
+  }
+  #cam-close {
+    position:absolute; top:10px; right:10px;
+    background:rgba(0,0,0,.6); border:none; border-radius:50%;
+    width:38px; height:38px; display:flex; align-items:center;
+    justify-content:center; cursor:pointer; color:#fff; z-index:10;
+    pointer-events:all;
+  }
   #cam-close i { font-size:20px; }
-  #cam-status { padding:10px 16px; font-size:13px; color:var(--text3); background:var(--bg3); border-top:1px solid var(--border); text-align:center; }
+  #cam-status {
+    padding:10px 16px; font-size:13px; color:var(--text3);
+    background:var(--bg3); border-top:1px solid var(--border); text-align:center;
+  }
+  .scan-line {
+    position:absolute; left:10%; right:10%; height:2px;
+    background:var(--orange); opacity:0.8;
+    animation:scanMove 2s linear infinite;
+    box-shadow: 0 0 6px var(--orange);
+  }
+  @keyframes scanMove {
+    0%   { top:20%; }
+    50%  { top:75%; }
+    100% { top:20%; }
+  }
+
   #sugs { margin-top:12px; border:1px solid var(--border); border-radius:18px; overflow:hidden; display:none; max-height:560px; overflow-y:auto; background:#fff; }
   .sort-bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:8px; padding:12px; background:#fff; border-bottom:1px solid var(--border); }
   .sort-btn { border:1px solid var(--border2); background:#fff; color:var(--black); border-radius:999px; padding:8px 12px; font-size:12px; font-weight:900; cursor:pointer; }
@@ -104,16 +138,6 @@
   #ts { margin-top:16px; font-size:13px; color:var(--text3); text-align:right; display:none; }
   mark { background:var(--warn-bg); color:var(--black); border-radius:3px; padding:0 3px; }
   footer { margin-top:28px; font-size:13px; color:var(--text3); text-align:center; }
-
-  /* Video container iOS */
-  #cam-video {
-    width:100%;
-    max-height:320px;
-    display:block;
-    background:#000;
-    object-fit:cover;
-  }
-
   @media(max-width:640px){
     body{padding:0 10px 34px;}
     header{padding:20px 0 14px;max-width:100%;}
@@ -164,11 +188,11 @@
       </button>
     </div>
 
-    <div id="cam-reader-wrap">
+    <div id="cam-wrap">
       <video id="cam-video" playsinline autoplay muted></video>
-      <button id="cam-close" aria-label="Cerrar cámara">
-        <i class="ti ti-x" aria-hidden="true"></i>
-      </button>
+      <canvas id="cam-canvas" style="display:none"></canvas>
+      <div id="cam-overlay"><div class="scan-line"></div></div>
+      <button id="cam-close"><i class="ti ti-x"></i></button>
       <div id="cam-status">Apuntá la cámara al código de barras…</div>
     </div>
 
@@ -185,14 +209,15 @@
 
 <footer>Precios con IVA incluido · Datos actualizados desde Google Sheets</footer>
 
+<script src="https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js"></script>
 <script>
 var API_URL = 'https://script.google.com/macros/s/AKfycbwFYU8jpF7mXw75TC7XbiXH6iwuy8GPz1YZEQxglY1CxcaR89voBoAYj_sjoWoEZMo/exec?action=precios';
 
 var items = [], debounceTimer, currentMatches = [], sortMode = 'stock';
 var cameraOpen = false;
 var activeStream = null;
+var scanInterval = null;
 var zxingReader = null;
-var zxingLoaded = false;
 
 var inp       = document.getElementById('inp');
 var clrBtn    = document.getElementById('clr-btn');
@@ -204,10 +229,11 @@ var statusEl  = document.getElementById('status-text');
 var dotEl     = document.getElementById('dot');
 var tsEl      = document.getElementById('ts');
 var camBtn    = document.getElementById('cam-btn');
-var camWrap   = document.getElementById('cam-reader-wrap');
+var camWrap   = document.getElementById('cam-wrap');
 var camClose  = document.getElementById('cam-close');
 var camStatus = document.getElementById('cam-status');
 var videoEl   = document.getElementById('cam-video');
+var canvasEl  = document.getElementById('cam-canvas');
 
 /* ── Utilidades ── */
 function ars(n) {
@@ -218,9 +244,7 @@ function ars(n) {
 function esc(t) {
   return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
-function norm(t) {
-  return String(t||'').toUpperCase().replace(/[\s\-_\.\/]/g,'').trim();
-}
+function norm(t) { return String(t||'').toUpperCase().replace(/[\s\-_\.\/]/g,'').trim(); }
 function hasPromo(item) {
   return item.promo != null && !isNaN(Number(item.promo)) &&
          Number(item.promo) > 0 && Number(item.promo) < Number(item.pvp);
@@ -228,116 +252,52 @@ function hasPromo(item) {
 function finalPrice(item) { return hasPromo(item) ? Number(item.promo) : Number(item.pvp); }
 function discountText(item) {
   if (item.descuento != null && !isNaN(Number(item.descuento))) return Math.round(Number(item.descuento)) + '% OFF';
-  if (hasPromo(item)) return Math.round(100 - (Number(item.promo)*100/Number(item.pvp))) + '% OFF';
+  if (hasPromo(item)) return Math.round(100-(Number(item.promo)*100/Number(item.pvp))) + '% OFF';
   return '';
 }
 function stockClass(item) {
   var s = Number(item.exist||0);
-  if (s <= 0) return 'stock-zero';
-  if (s <= 3) return 'stock-low';
-  return 'stock-ok';
+  return s<=0 ? 'stock-zero' : s<=3 ? 'stock-low' : 'stock-ok';
 }
 function stockText(item) {
   var s = Number(item.exist||0);
-  if (s <= 0) return 'Sin stock';
-  if (s === 1) return '1 unidad en stock';
-  return s + ' unidades en stock';
+  return s<=0 ? 'Sin stock' : s===1 ? '1 unidad en stock' : s+' unidades en stock';
 }
-function hl(text, q) {
-  text = String(text||''); q = String(q||'');
-  if (!q||!text) return esc(text);
-  var i = text.toLowerCase().indexOf(q.toLowerCase());
-  if (i === -1) return esc(text);
+function hl(text,q) {
+  text=String(text||''); q=String(q||'');
+  if(!q||!text) return esc(text);
+  var i=text.toLowerCase().indexOf(q.toLowerCase());
+  if(i===-1) return esc(text);
   return esc(text.slice(0,i))+'<mark>'+esc(text.slice(i,i+q.length))+'</mark>'+esc(text.slice(i+q.length));
 }
 function thumbHtml(item) {
-  if (item.foto) {
-    return '<img class="sug-thumb" src="'+esc(item.foto)+'" alt="" onerror="this.style.display=\'none\'">';
-  }
-  return '<div class="sug-thumb-placeholder"><i class="ti ti-shirt" aria-hidden="true"></i></div>';
+  if(item.foto) return '<img class="sug-thumb" src="'+esc(item.foto)+'" alt="" onerror="this.style.display=\'none\'">';
+  return '<div class="sug-thumb-placeholder"><i class="ti ti-shirt"></i></div>';
 }
 
 /* ── UI ── */
-function hideAll() {
-  sugsEl.style.display = 'none';
-  resEl.style.display  = 'none';
-  empEl.style.display  = 'none';
-}
-function clearAll() {
-  inp.value = '';
-  clrBtn.style.display = 'none';
-  currentMatches = [];
-  hideAll();
-  inp.focus();
-}
+function hideAll() { sugsEl.style.display='none'; resEl.style.display='none'; empEl.style.display='none'; }
+function clearAll() { inp.value=''; clrBtn.style.display='none'; currentMatches=[]; hideAll(); inp.focus(); }
 clrBtn.addEventListener('click', clearAll);
 
 /* ── Pistola ── */
-var lastKeyTime = 0;
-var isScanningGun = false;
-
+var lastKeyTime=0, isScanningGun=false;
 document.addEventListener('keydown', function(e) {
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (document.activeElement !== inp) inp.focus();
-  if (e.key === 'Escape') clearAll();
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(document.activeElement!==inp) inp.focus();
+  if(e.key==='Escape') clearAll();
 });
-
 document.addEventListener('keypress', function(e) {
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-  var now = Date.now();
-  var diff = now - lastKeyTime;
-  lastKeyTime = now;
-  if (diff < 50 && e.key.length === 1) {
-    if (!isScanningGun) { isScanningGun = true; inp.value = ''; }
-  } else {
-    isScanningGun = false;
-  }
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  var now=Date.now(), diff=now-lastKeyTime; lastKeyTime=now;
+  if(diff<50&&e.key.length===1){ if(!isScanningGun){isScanningGun=true;inp.value='';} }
+  else{ isScanningGun=false; }
 });
-
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && isScanningGun) {
-    isScanningGun = false;
-    clearTimeout(debounceTimer);
-    search(inp.value);
-  }
+  if(e.key==='Enter'&&isScanningGun){ isScanningGun=false; clearTimeout(debounceTimer); search(inp.value); }
 });
 
-/* ── Cámara: getUserMedia directo + ZXing ── */
-function loadZXing(callback) {
-  if (zxingLoaded) { callback(); return; }
-  var s = document.createElement('script');
-  s.src = 'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js';
-  s.onload = function() { zxingLoaded = true; callback(); };
-  s.onerror = function() {
-    camStatus.textContent = 'Error cargando librería de cámara.';
-    cerrarCamara();
-  };
-  document.head.appendChild(s);
-}
-
-function iniciarConStream(stream) {
-  activeStream = stream;
-  videoEl.srcObject = stream;
-  videoEl.play();
-
-  loadZXing(function() {
-    try {
-      zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
-      zxingReader.decodeFromStream(stream, videoEl, function(result, err) {
-        if (result) {
-          var code = result.getText();
-          inp.value = code.toUpperCase();
-          cerrarCamara();
-          search(code);
-        }
-      });
-      camStatus.textContent = 'Apuntá la cámara al código de barras…';
-    } catch(e) {
-      camStatus.textContent = 'Error iniciando lector: ' + e.message;
-    }
-  });
-}
-
+/* ── Cámara ── */
 function abrirCamara() {
   if (cameraOpen) { cerrarCamara(); return; }
 
@@ -347,30 +307,89 @@ function abrirCamara() {
   cameraOpen = true;
   camStatus.textContent = 'Solicitando acceso a la cámara…';
 
-  // getUserMedia sincrónico al tap — iOS Safari lo acepta
   navigator.mediaDevices.getUserMedia({
-    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+    video: { facingMode: { ideal: 'environment' } },
     audio: false
   })
   .then(function(stream) {
-    iniciarConStream(stream);
+    activeStream = stream;
+    videoEl.srcObject = stream;
+
+    videoEl.onloadedmetadata = function() {
+      videoEl.play().then(function() {
+        camStatus.textContent = 'Apuntá la cámara al código de barras…';
+        iniciarLector();
+      }).catch(function(e) {
+        camStatus.textContent = 'Error iniciando video: ' + e.message;
+      });
+    };
   })
   .catch(function(err) {
-    var msg = err.name === 'NotAllowedError'
-      ? 'Permiso de cámara denegado. Habilitalo en Ajustes > Safari > Cámara.'
-      : 'No se pudo acceder a la cámara: ' + err.message;
+    var msg = err.name==='NotAllowedError'
+      ? 'Permiso denegado. Habilitá la cámara en Ajustes > Safari.'
+      : 'Error: ' + err.message;
     camStatus.textContent = msg;
     cerrarCamara();
   });
 }
 
-function cerrarCamara() {
-  if (zxingReader) {
-    try { zxingReader.reset(); } catch(e) {}
-    zxingReader = null;
+function iniciarLector() {
+  // Usamos ZXing con decodeFromStream — compatible con iOS 16+
+  try {
+    zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+    zxingReader.decodeFromStream(activeStream, videoEl, function(result, err) {
+      if (result) {
+        var code = result.getText();
+        inp.value = code.toUpperCase();
+        cerrarCamara();
+        search(code);
+      }
+      // err es normal cuando no hay código en el frame, no hacer nada
+    });
+  } catch(e) {
+    // Fallback: escaneo manual con canvas cada 400ms
+    camStatus.textContent = 'Modo alternativo — apuntá al código…';
+    iniciarScanCanvas();
   }
+}
+
+function iniciarScanCanvas() {
+  var ctx = canvasEl.getContext('2d');
+  var codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+
+  scanInterval = setInterval(function() {
+    if (!activeStream || !videoEl.videoWidth) return;
+    canvasEl.width  = videoEl.videoWidth;
+    canvasEl.height = videoEl.videoHeight;
+    ctx.drawImage(videoEl, 0, 0);
+
+    canvasEl.toBlob(function(blob) {
+      if (!blob) return;
+      var url = URL.createObjectURL(blob);
+      var img = new Image();
+      img.onload = function() {
+        try {
+          codeReader.decodeFromImageElement(img).then(function(result) {
+            URL.revokeObjectURL(url);
+            if (result) {
+              var code = result.getText();
+              inp.value = code.toUpperCase();
+              cerrarCamara();
+              search(code);
+            }
+          }).catch(function() { URL.revokeObjectURL(url); });
+        } catch(e) { URL.revokeObjectURL(url); }
+      };
+      img.src = url;
+    }, 'image/jpeg', 0.8);
+  }, 400);
+}
+
+function cerrarCamara() {
+  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+  if (zxingReader) { try { zxingReader.reset(); } catch(e){} zxingReader = null; }
   if (activeStream) {
-    try { activeStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {}
+    try { activeStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
     activeStream = null;
   }
   videoEl.srcObject = null;
@@ -385,178 +404,100 @@ camClose.addEventListener('click', cerrarCamara);
 
 /* ── Ordenamiento ── */
 function sortMatches(arr) {
-  arr = arr.slice();
-  if      (sortMode==='az')         arr.sort(function(a,b){ return String(a.desc||a.codigo).localeCompare(String(b.desc||b.codigo),'es'); });
-  else if (sortMode==='za')         arr.sort(function(a,b){ return String(b.desc||b.codigo).localeCompare(String(a.desc||a.codigo),'es'); });
-  else if (sortMode==='price_asc')  arr.sort(function(a,b){ return finalPrice(a)-finalPrice(b); });
-  else if (sortMode==='price_desc') arr.sort(function(a,b){ return finalPrice(b)-finalPrice(a); });
-  else                              arr.sort(function(a,b){ return Number(b.exist||0)-Number(a.exist||0); });
+  arr=arr.slice();
+  if(sortMode==='az')         arr.sort(function(a,b){return String(a.desc||a.codigo).localeCompare(String(b.desc||b.codigo),'es');});
+  else if(sortMode==='za')    arr.sort(function(a,b){return String(b.desc||b.codigo).localeCompare(String(a.desc||a.codigo),'es');});
+  else if(sortMode==='price_asc')  arr.sort(function(a,b){return finalPrice(a)-finalPrice(b);});
+  else if(sortMode==='price_desc') arr.sort(function(a,b){return finalPrice(b)-finalPrice(a);});
+  else arr.sort(function(a,b){return Number(b.exist||0)-Number(a.exist||0);});
   return arr;
 }
 
 /* ── Render sugerencias ── */
-function renderMatches(matches, t) {
-  var sorted = sortMatches(matches);
-  var html =
-    '<div class="sort-bar">' +
-      '<button class="sort-btn '+(sortMode==='stock'?'active':'')+'" data-sort="stock">STOCK</button>' +
-      '<button class="sort-btn '+(sortMode==='az'?'active':'')+'" data-sort="az">A-Z</button>' +
-      '<button class="sort-btn '+(sortMode==='za'?'active':'')+'" data-sort="za">Z-A</button>' +
-      '<button class="sort-btn '+(sortMode==='price_asc'?'active':'')+'" data-sort="price_asc">$ MENOR</button>' +
-      '<button class="sort-btn '+(sortMode==='price_desc'?'active':'')+'" data-sort="price_desc">$ MAYOR</button>' +
-    '</div>' +
+function renderMatches(matches,t) {
+  var sorted=sortMatches(matches);
+  var html=
+    '<div class="sort-bar">'+
+      '<button class="sort-btn '+(sortMode==='stock'?'active':'')+'" data-sort="stock">STOCK</button>'+
+      '<button class="sort-btn '+(sortMode==='az'?'active':'')+'" data-sort="az">A-Z</button>'+
+      '<button class="sort-btn '+(sortMode==='za'?'active':'')+'" data-sort="za">Z-A</button>'+
+      '<button class="sort-btn '+(sortMode==='price_asc'?'active':'')+'" data-sort="price_asc">$ MENOR</button>'+
+      '<button class="sort-btn '+(sortMode==='price_desc'?'active':'')+'" data-sort="price_desc">$ MAYOR</button>'+
+    '</div>'+
     '<div class="count-label">'+sorted.length.toLocaleString('es-AR')+' artículos encontrados</div>';
-
-  html += sorted.map(function(s) {
-    var promoHtml = hasPromo(s)
-      ? '<span class="sug-old-price">'+ars(s.pvp)+'</span><span class="sug-discount">'+esc(discountText(s))+'</span>'
-      : '';
-    return '<button class="sug-row" data-codigo="'+esc(s.codigo)+'">' +
-      thumbHtml(s) +
-      '<div class="sug-left">' +
-        '<span class="sug-desc">'+(hl(s.desc,t)||esc(s.codigo))+'</span>' +
-        '<span class="sug-code">'+esc(s.cat||'')+' / '+hl(s.codigo,t)+'</span>' +
-      '</div>' +
-      '<div class="sug-right">' +
-        '<span class="sug-price">'+ars(finalPrice(s))+'</span>' +
-        promoHtml +
-      '</div>' +
+  html+=sorted.map(function(s){
+    var ph=hasPromo(s)?'<span class="sug-old-price">'+ars(s.pvp)+'</span><span class="sug-discount">'+esc(discountText(s))+'</span>':'';
+    return '<button class="sug-row" data-codigo="'+esc(s.codigo)+'">'+
+      thumbHtml(s)+
+      '<div class="sug-left"><span class="sug-desc">'+(hl(s.desc,t)||esc(s.codigo))+'</span><span class="sug-code">'+esc(s.cat||'')+' / '+hl(s.codigo,t)+'</span></div>'+
+      '<div class="sug-right"><span class="sug-price">'+ars(finalPrice(s))+'</span>'+ph+'</div>'+
     '</button>';
   }).join('');
-
-  sugsEl.innerHTML = html;
-  sugsEl.style.display = 'block';
-
-  sugsEl.querySelectorAll('.sort-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      sortMode = btn.getAttribute('data-sort');
-      renderMatches(currentMatches, inp.value);
-    });
+  sugsEl.innerHTML=html; sugsEl.style.display='block';
+  sugsEl.querySelectorAll('.sort-btn').forEach(function(btn){
+    btn.addEventListener('click',function(e){e.stopPropagation();sortMode=btn.getAttribute('data-sort');renderMatches(currentMatches,inp.value);});
   });
-
-  sugsEl.querySelectorAll('.sug-row').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var codigo = btn.getAttribute('data-codigo');
-      for (var i=0; i<items.length; i++) {
-        if (items[i].codigo === codigo) {
-          inp.value = items[i].codigo;
-          showResult(items[i]);
-          sugsEl.style.display = 'none';
-          return;
-        }
-      }
+  sugsEl.querySelectorAll('.sug-row').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      var c=btn.getAttribute('data-codigo');
+      for(var i=0;i<items.length;i++){if(items[i].codigo===c){inp.value=items[i].codigo;showResult(items[i]);sugsEl.style.display='none';return;}}
     });
   });
 }
 
 /* ── Búsqueda ── */
 function search(q) {
-  var t = q.trim();
-  hideAll();
-  if (!t) { clrBtn.style.display='none'; currentMatches=[]; return; }
-  clrBtn.style.display = 'flex';
-
-  var tn = norm(t), tu = t.toUpperCase(), exact = null;
-  for (var i=0; i<items.length; i++) {
-    if (norm(items[i].codigo) === tn) { exact = items[i]; break; }
-  }
-  if (exact) { currentMatches=[]; showResult(exact); return; }
-
-  var matches = items.filter(function(it) {
-    return norm(it.codigo).indexOf(tn)!==-1 ||
-           String(it.desc||'').toUpperCase().indexOf(tu)!==-1 ||
-           String(it.cat||'').toUpperCase().indexOf(tu)!==-1;
+  var t=q.trim(); hideAll();
+  if(!t){clrBtn.style.display='none';currentMatches=[];return;}
+  clrBtn.style.display='flex';
+  var tn=norm(t),tu=t.toUpperCase(),exact=null;
+  for(var i=0;i<items.length;i++){if(norm(items[i].codigo)===tn){exact=items[i];break;}}
+  if(exact){currentMatches=[];showResult(exact);return;}
+  var matches=items.filter(function(it){
+    return norm(it.codigo).indexOf(tn)!==-1||String(it.desc||'').toUpperCase().indexOf(tu)!==-1||String(it.cat||'').toUpperCase().indexOf(tu)!==-1;
   });
-  currentMatches = matches;
-  if (matches.length===1) { showResult(matches[0]); return; }
-  if (matches.length>1)   { renderMatches(matches,t); return; }
-
-  empMsg.textContent = 'No se encontró "'+t+'"';
-  empEl.style.display = 'block';
+  currentMatches=matches;
+  if(matches.length===1){showResult(matches[0]);return;}
+  if(matches.length>1){renderMatches(matches,t);return;}
+  empMsg.textContent='No se encontró "'+t+'"';
+  empEl.style.display='block';
 }
 
 /* ── Mostrar resultado ── */
 function showResult(item) {
-  resEl.innerHTML = '';
-  var card = document.createElement('div');
-  card.className = 'result-card';
-
-  var fotoWrap = document.createElement('div');
-  fotoWrap.className = 'result-foto-wrap';
-  if (item.foto) {
-    var img = document.createElement('img');
-    img.className = 'result-foto';
-    img.src = item.foto;
-    img.alt = item.desc || '';
-    img.onerror = function() { fotoWrap.style.display = 'none'; };
-    fotoWrap.appendChild(img);
-  } else {
-    fotoWrap.style.display = 'none';
-  }
-  card.appendChild(fotoWrap);
-
-  var top = document.createElement('div');
-  top.className = 'result-top';
-  top.innerHTML =
-    '<span class="cat-badge">'+esc(item.cat||'SIN CATEGORÍA')+'</span>' +
-    '<div class="result-desc">'+esc(item.desc||item.codigo)+'</div>' +
-    '<div class="result-code">'+esc(item.codigo)+'</div>';
+  resEl.innerHTML='';
+  var card=document.createElement('div'); card.className='result-card';
+  var fw=document.createElement('div'); fw.className='result-foto-wrap';
+  if(item.foto){var img=document.createElement('img');img.className='result-foto';img.src=item.foto;img.alt=item.desc||'';img.onerror=function(){fw.style.display='none';};fw.appendChild(img);}
+  else{fw.style.display='none';}
+  card.appendChild(fw);
+  var top=document.createElement('div'); top.className='result-top';
+  top.innerHTML='<span class="cat-badge">'+esc(item.cat||'SIN CATEGORÍA')+'</span><div class="result-desc">'+esc(item.desc||item.codigo)+'</div><div class="result-code">'+esc(item.codigo)+'</div>';
   card.appendChild(top);
-
-  var pb = document.createElement('div');
-  pb.className = 'price-block';
-  var promoHtml = hasPromo(item)
-    ? '<div class="promo-row"><span class="old-price">'+ars(item.pvp)+'</span><span class="discount-badge">'+esc(discountText(item))+'</span></div>'
-    : '';
-  pb.innerHTML =
-    '<div class="price-label">'+(hasPromo(item)?'Precio promoción con IVA':'Precio final con IVA')+'</div>' +
-    '<div class="price-val">'+ars(finalPrice(item))+'</div>' +
-    promoHtml +
-    '<div class="price-note">'+(hasPromo(item)?'Precio promocional de venta al público':'Precio de venta al público')+'</div>';
+  var pb=document.createElement('div'); pb.className='price-block';
+  var ph=hasPromo(item)?'<div class="promo-row"><span class="old-price">'+ars(item.pvp)+'</span><span class="discount-badge">'+esc(discountText(item))+'</span></div>':'';
+  pb.innerHTML='<div class="price-label">'+(hasPromo(item)?'Precio promoción con IVA':'Precio final con IVA')+'</div><div class="price-val">'+ars(finalPrice(item))+'</div>'+ph+'<div class="price-note">'+(hasPromo(item)?'Precio promocional':'Precio de venta al público')+'</div>';
   card.appendChild(pb);
-
-  if (item.exist != null) {
-    var st = document.createElement('div');
-    st.className = 'result-stock ' + stockClass(item);
-    st.innerHTML = '<i class="ti ti-package" aria-hidden="true"></i>' + esc(stockText(item));
-    card.appendChild(st);
-  }
-
-  resEl.appendChild(card);
-  resEl.style.display = 'block';
-  tsEl.textContent = 'Última consulta: ' + new Date().toLocaleTimeString('es-AR');
-  tsEl.style.display = 'block';
-  resEl.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  if(item.exist!=null){var st=document.createElement('div');st.className='result-stock '+stockClass(item);st.innerHTML='<i class="ti ti-package"></i>'+esc(stockText(item));card.appendChild(st);}
+  resEl.appendChild(card); resEl.style.display='block';
+  tsEl.textContent='Última consulta: '+new Date().toLocaleTimeString('es-AR');
+  tsEl.style.display='block';
+  resEl.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 /* ── Input manual ── */
-inp.addEventListener('input', function(e) {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(function(){ search(e.target.value); }, 150);
-});
-inp.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter')  { clearTimeout(debounceTimer); search(inp.value); }
-  if (e.key === 'Escape') clearAll();
-});
+inp.addEventListener('input',function(e){clearTimeout(debounceTimer);debounceTimer=setTimeout(function(){search(e.target.value);},150);});
+inp.addEventListener('keydown',function(e){if(e.key==='Enter'){clearTimeout(debounceTimer);search(inp.value);}if(e.key==='Escape')clearAll();});
 
 /* ── Carga de datos ── */
 fetch(API_URL)
-  .then(function(r) {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
+  .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+  .then(function(data){
+    items=Array.isArray(data)?data:[];
+    statusEl.textContent=items.length.toLocaleString('es-AR')+' artículos listos';
+    dotEl.className='dot ok'; inp.disabled=false; inp.focus();
   })
-  .then(function(data) {
-    items = Array.isArray(data) ? data : [];
-    statusEl.textContent = items.length.toLocaleString('es-AR') + ' artículos listos';
-    dotEl.className = 'dot ok';
-    inp.disabled = false;
-    inp.focus();
-  })
-  .catch(function(err) {
-    statusEl.textContent = 'Error al cargar: ' + err.message;
-    dotEl.className = 'dot err';
-  });
+  .catch(function(err){statusEl.textContent='Error al cargar: '+err.message;dotEl.className='dot err';});
 </script>
 </body>
 </html>
