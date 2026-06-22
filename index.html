@@ -178,6 +178,9 @@
 
 <footer>Precios con IVA incluido · Datos actualizados desde Google Sheets</footer>
 
+<!-- Librería local: subir este archivo al repo en /vendor/zxing-browser.js -->
+<script src="./vendor/zxing-browser.js"></script>
+
 <script>
 var API_URL = 'https://script.google.com/macros/s/AKfycbwFYU8jpF7mXw75TC7XbiXH6iwuy8GPz1YZEQxglY1CxcaR89voBoAYj_sjoWoEZMo/exec?action=precios';
 
@@ -259,35 +262,11 @@ var scanBusy = false;
 var detector = null;
 
 function cargarZXing() {
+  // ZXing ya no se descarga desde CDN en runtime.
+  // Debe estar subido al repo como /vendor/zxing-browser.js y cargado con:
+  // <script src="./vendor/zxing-browser.js"></script>
   if (window.ZXingBrowser) return Promise.resolve();
-  if (zxingLoadPromise) return zxingLoadPromise;
-
-  var urls = [
-    'https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js',
-    'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js'
-  ];
-
-  zxingLoadPromise = new Promise(function(resolve, reject) {
-    var i = 0;
-    function probarSiguiente() {
-      if (i >= urls.length) {
-        reject(new Error('No se pudo cargar ZXing desde los CDN'));
-        return;
-      }
-      var script = document.createElement('script');
-      script.src = urls[i++];
-      script.async = true;
-      script.onload = function() {
-        if (window.ZXingBrowser) resolve();
-        else probarSiguiente();
-      };
-      script.onerror = probarSiguiente;
-      document.head.appendChild(script);
-    }
-    probarSiguiente();
-  });
-
-  return zxingLoadPromise;
+  return Promise.reject(new Error('ZXing local no cargó. Verificá que exista ./vendor/zxing-browser.js'));
 }
 
 function abrirCamara() {
@@ -360,7 +339,7 @@ function iniciarScanCanvas() {
       camStatus.textContent = 'ZXing no cargó. Probando lector nativo del navegador…';
       iniciarLoopEscaneo();
     } else {
-      camStatus.textContent = 'No se pudo cargar el lector. Revisá conexión/CDN o tipeá el código.';
+      camStatus.textContent = 'No se pudo cargar el lector local. Verificá /vendor/zxing-browser.js o tipeá el código.';
     }
   });
 }
