@@ -104,6 +104,16 @@
   #ts { margin-top:16px; font-size:13px; color:var(--text3); text-align:right; display:none; }
   mark { background:var(--warn-bg); color:var(--black); border-radius:3px; padding:0 3px; }
   footer { margin-top:28px; font-size:13px; color:var(--text3); text-align:center; }
+
+  /* Video container iOS */
+  #cam-video {
+    width:100%;
+    max-height:320px;
+    display:block;
+    background:#000;
+    object-fit:cover;
+  }
+
   @media(max-width:640px){
     body{padding:0 10px 34px;}
     header{padding:20px 0 14px;max-width:100%;}
@@ -153,13 +163,15 @@
         <i class="ti ti-camera" aria-hidden="true"></i>
       </button>
     </div>
+
     <div id="cam-reader-wrap">
-      <div id="cam-reader"></div>
+      <video id="cam-video" playsinline autoplay muted></video>
       <button id="cam-close" aria-label="Cerrar cámara">
         <i class="ti ti-x" aria-hidden="true"></i>
       </button>
       <div id="cam-status">Apuntá la cámara al código de barras…</div>
     </div>
+
     <div id="sugs"></div>
     <div id="result"></div>
     <div id="empty">
@@ -174,11 +186,11 @@
 <footer>Precios con IVA incluido · Datos actualizados desde Google Sheets</footer>
 
 <script>
-// ── CONFIGURACIÓN ──
 var API_URL = 'https://script.google.com/macros/s/AKfycbwFYU8jpF7mXw75TC7XbiXH6iwuy8GPz1YZEQxglY1CxcaR89voBoAYj_sjoWoEZMo/exec?action=precios';
 
 var items = [], debounceTimer, currentMatches = [], sortMode = 'stock';
 var cameraOpen = false;
+var activeStream = null;
 var zxingReader = null;
 var zxingLoaded = false;
 
@@ -195,6 +207,7 @@ var camBtn    = document.getElementById('cam-btn');
 var camWrap   = document.getElementById('cam-reader-wrap');
 var camClose  = document.getElementById('cam-close');
 var camStatus = document.getElementById('cam-status');
+var videoEl   = document.getElementById('cam-video');
 
 /* ── Utilidades ── */
 function ars(n) {
@@ -289,50 +302,66 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
-/* ── Cámara (ZXing — funciona en iOS Safari desde página real) ── */
+/* ── Cámara: getUserMedia directo + ZXing ── */
 function loadZXing(callback) {
   if (zxingLoaded) { callback(); return; }
   var s = document.createElement('script');
   s.src = 'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js';
   s.onload = function() { zxingLoaded = true; callback(); };
-  s.onerror = function() { camStatus.textContent = 'Error cargando librería.'; cerrarCamara(); };
+  s.onerror = function() {
+    camStatus.textContent = 'Error cargando librería de cámara.';
+    cerrarCamara();
+  };
   document.head.appendChild(s);
 }
 
-function iniciarStream() {
-  var videoEl = document.getElementById('cam-video');
-  if (!videoEl) {
-    videoEl = document.createElement('video');
-    videoEl.id = 'cam-video';
-    videoEl.style.cssText = 'width:100%;max-height:300px;display:block;';
-    videoEl.setAttribute('playsinline', '');
-    document.getElementById('cam-reader').appendChild(videoEl);
-  }
-  try {
-    zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
-    zxingReader.decodeFromVideoDevice(null, 'cam-video', function(result) {
-      if (result) {
-        var code = result.getText();
-        inp.value = code.toUpperCase();
-        cerrarCamara();
-        search(code);
-      }
-    });
-    camStatus.textContent = 'Apuntá la cámara al código de barras…';
-  } catch(e) {
-    camStatus.textContent = 'No se pudo acceder a la cámara.';
-    cerrarCamara();
-  }
+function iniciarConStream(stream) {
+  activeStream = stream;
+  videoEl.srcObject = stream;
+  videoEl.play();
+
+  loadZXing(function() {
+    try {
+      zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+      zxingReader.decodeFromStream(stream, videoEl, function(result, err) {
+        if (result) {
+          var code = result.getText();
+          inp.value = code.toUpperCase();
+          cerrarCamara();
+          search(code);
+        }
+      });
+      camStatus.textContent = 'Apuntá la cámara al código de barras…';
+    } catch(e) {
+      camStatus.textContent = 'Error iniciando lector: ' + e.message;
+    }
+  });
 }
 
 function abrirCamara() {
   if (cameraOpen) { cerrarCamara(); return; }
+
   camWrap.classList.add('open');
   camBtn.classList.add('active');
   camBtn.querySelector('i').className = 'ti ti-camera-off';
   cameraOpen = true;
-  camStatus.textContent = 'Cargando…';
-  loadZXing(iniciarStream);
+  camStatus.textContent = 'Solicitando acceso a la cámara…';
+
+  // getUserMedia sincrónico al tap — iOS Safari lo acepta
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+    audio: false
+  })
+  .then(function(stream) {
+    iniciarConStream(stream);
+  })
+  .catch(function(err) {
+    var msg = err.name === 'NotAllowedError'
+      ? 'Permiso de cámara denegado. Habilitalo en Ajustes > Safari > Cámara.'
+      : 'No se pudo acceder a la cámara: ' + err.message;
+    camStatus.textContent = msg;
+    cerrarCamara();
+  });
 }
 
 function cerrarCamara() {
@@ -340,11 +369,11 @@ function cerrarCamara() {
     try { zxingReader.reset(); } catch(e) {}
     zxingReader = null;
   }
-  var videoEl = document.getElementById('cam-video');
-  if (videoEl && videoEl.srcObject) {
-    try { videoEl.srcObject.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {}
-    videoEl.srcObject = null;
+  if (activeStream) {
+    try { activeStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {}
+    activeStream = null;
   }
+  videoEl.srcObject = null;
   camWrap.classList.remove('open');
   camBtn.classList.remove('active');
   camBtn.querySelector('i').className = 'ti ti-camera';
@@ -511,7 +540,7 @@ inp.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') clearAll();
 });
 
-/* ── Carga de datos via fetch (GitHub Pages → Apps Script API) ── */
+/* ── Carga de datos ── */
 fetch(API_URL)
   .then(function(r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
