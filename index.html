@@ -53,46 +53,15 @@
   #cam-btn:hover { background:#2a2a28; }
   #cam-btn i { font-size:26px; }
   #cam-btn.active { background:var(--orange); color:#fff; }
-
-  /* Cámara */
-  #cam-wrap {
-    margin-top:14px; display:none; position:relative;
-    border:2px solid var(--orange); border-radius:16px; overflow:hidden;
-    background:#000;
-  }
+  #cam-wrap { margin-top:14px; display:none; position:relative; border:2px solid var(--orange); border-radius:16px; overflow:hidden; background:#000; }
   #cam-wrap.open { display:block; }
-  #cam-video {
-    width:100%; display:block;
-    max-height:340px; object-fit:cover;
-  }
-  #cam-overlay {
-    position:absolute; top:0; left:0; right:0; bottom:0;
-    pointer-events:none;
-  }
-  #cam-close {
-    position:absolute; top:10px; right:10px;
-    background:rgba(0,0,0,.6); border:none; border-radius:50%;
-    width:38px; height:38px; display:flex; align-items:center;
-    justify-content:center; cursor:pointer; color:#fff; z-index:10;
-    pointer-events:all;
-  }
+  #cam-video { width:100%; display:block; max-height:340px; object-fit:cover; }
+  #cam-overlay { position:absolute; top:0; left:0; right:0; bottom:0; pointer-events:none; }
+  #cam-close { position:absolute; top:10px; right:10px; background:rgba(0,0,0,.6); border:none; border-radius:50%; width:38px; height:38px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#fff; z-index:10; }
   #cam-close i { font-size:20px; }
-  #cam-status {
-    padding:10px 16px; font-size:13px; color:var(--text3);
-    background:var(--bg3); border-top:1px solid var(--border); text-align:center;
-  }
-  .scan-line {
-    position:absolute; left:10%; right:10%; height:2px;
-    background:var(--orange); opacity:0.8;
-    animation:scanMove 2s linear infinite;
-    box-shadow: 0 0 6px var(--orange);
-  }
-  @keyframes scanMove {
-    0%   { top:20%; }
-    50%  { top:75%; }
-    100% { top:20%; }
-  }
-
+  #cam-status { padding:10px 16px; font-size:13px; color:var(--text3); background:var(--bg3); border-top:1px solid var(--border); text-align:center; }
+  .scan-line { position:absolute; left:10%; right:10%; height:2px; background:var(--orange); opacity:0.8; animation:scanMove 2s linear infinite; box-shadow:0 0 6px var(--orange); }
+  @keyframes scanMove { 0%{top:20%} 50%{top:75%} 100%{top:20%} }
   #sugs { margin-top:12px; border:1px solid var(--border); border-radius:18px; overflow:hidden; display:none; max-height:560px; overflow-y:auto; background:#fff; }
   .sort-bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:8px; padding:12px; background:#fff; border-bottom:1px solid var(--border); }
   .sort-btn { border:1px solid var(--border2); background:#fff; color:var(--black); border-radius:999px; padding:8px 12px; font-size:12px; font-weight:900; cursor:pointer; }
@@ -193,7 +162,7 @@
       <canvas id="cam-canvas" style="display:none"></canvas>
       <div id="cam-overlay"><div class="scan-line"></div></div>
       <button id="cam-close"><i class="ti ti-x"></i></button>
-      <div id="cam-status">Apuntá la cámara al código de barras…</div>
+      <div id="cam-status">Iniciando cámara…</div>
     </div>
 
     <div id="sugs"></div>
@@ -210,34 +179,12 @@
 <footer>Precios con IVA incluido · Datos actualizados desde Google Sheets</footer>
 
 <script>
-// Carga ZXing de forma segura antes de usarlo
-var zxingReady = false;
-var zxingCallbacks = [];
-
-function onZXingReady(fn) {
-  if (zxingReady) { fn(); return; }
-  zxingCallbacks.push(fn);
-}
-
-(function() {
-  var s = document.createElement('script');
-  s.src = 'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js';
-  s.onload = function() {
-    zxingReady = true;
-    zxingCallbacks.forEach(function(fn){ fn(); });
-    zxingCallbacks = [];
-  };
-  document.head.appendChild(s);
-})();
-</script>
-<script>
 var API_URL = 'https://script.google.com/macros/s/AKfycbwFYU8jpF7mXw75TC7XbiXH6iwuy8GPz1YZEQxglY1CxcaR89voBoAYj_sjoWoEZMo/exec?action=precios';
 
 var items = [], debounceTimer, currentMatches = [], sortMode = 'stock';
 var cameraOpen = false;
 var activeStream = null;
 var scanInterval = null;
-var zxingReader = null;
 
 var inp       = document.getElementById('inp');
 var clrBtn    = document.getElementById('clr-btn');
@@ -257,32 +204,20 @@ var canvasEl  = document.getElementById('cam-canvas');
 
 /* ── Utilidades ── */
 function ars(n) {
-  n = Number(n);
-  if (isNaN(n)) return '—';
+  n = Number(n); if (isNaN(n)) return '—';
   return new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS',minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
 }
-function esc(t) {
-  return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-}
+function esc(t) { return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
 function norm(t) { return String(t||'').toUpperCase().replace(/[\s\-_\.\/]/g,'').trim(); }
-function hasPromo(item) {
-  return item.promo != null && !isNaN(Number(item.promo)) &&
-         Number(item.promo) > 0 && Number(item.promo) < Number(item.pvp);
-}
-function finalPrice(item) { return hasPromo(item) ? Number(item.promo) : Number(item.pvp); }
+function hasPromo(item) { return item.promo!=null&&!isNaN(Number(item.promo))&&Number(item.promo)>0&&Number(item.promo)<Number(item.pvp); }
+function finalPrice(item) { return hasPromo(item)?Number(item.promo):Number(item.pvp); }
 function discountText(item) {
-  if (item.descuento != null && !isNaN(Number(item.descuento))) return Math.round(Number(item.descuento)) + '% OFF';
-  if (hasPromo(item)) return Math.round(100-(Number(item.promo)*100/Number(item.pvp))) + '% OFF';
+  if(item.descuento!=null&&!isNaN(Number(item.descuento))) return Math.round(Number(item.descuento))+'% OFF';
+  if(hasPromo(item)) return Math.round(100-(Number(item.promo)*100/Number(item.pvp)))+'% OFF';
   return '';
 }
-function stockClass(item) {
-  var s = Number(item.exist||0);
-  return s<=0 ? 'stock-zero' : s<=3 ? 'stock-low' : 'stock-ok';
-}
-function stockText(item) {
-  var s = Number(item.exist||0);
-  return s<=0 ? 'Sin stock' : s===1 ? '1 unidad en stock' : s+' unidades en stock';
-}
+function stockClass(item) { var s=Number(item.exist||0); return s<=0?'stock-zero':s<=3?'stock-low':'stock-ok'; }
+function stockText(item) { var s=Number(item.exist||0); return s<=0?'Sin stock':s===1?'1 unidad en stock':s+' unidades en stock'; }
 function hl(text,q) {
   text=String(text||''); q=String(q||'');
   if(!q||!text) return esc(text);
@@ -302,24 +237,58 @@ clrBtn.addEventListener('click', clearAll);
 
 /* ── Pistola ── */
 var lastKeyTime=0, isScanningGun=false;
-document.addEventListener('keydown', function(e) {
+document.addEventListener('keydown',function(e){
   if(e.ctrlKey||e.metaKey||e.altKey) return;
   if(document.activeElement!==inp) inp.focus();
   if(e.key==='Escape') clearAll();
 });
-document.addEventListener('keypress', function(e) {
+document.addEventListener('keypress',function(e){
   if(e.ctrlKey||e.metaKey||e.altKey) return;
-  var now=Date.now(), diff=now-lastKeyTime; lastKeyTime=now;
-  if(diff<50&&e.key.length===1){ if(!isScanningGun){isScanningGun=true;inp.value='';} }
-  else{ isScanningGun=false; }
+  var now=Date.now(),diff=now-lastKeyTime; lastKeyTime=now;
+  if(diff<50&&e.key.length===1){if(!isScanningGun){isScanningGun=true;inp.value='';}}
+  else{isScanningGun=false;}
 });
-document.addEventListener('keydown', function(e) {
-  if(e.key==='Enter'&&isScanningGun){ isScanningGun=false; clearTimeout(debounceTimer); search(inp.value); }
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&isScanningGun){isScanningGun=false;clearTimeout(debounceTimer);search(inp.value);}
 });
 
-/* ── Cámara ── */
+/* ── Cámara con canvas polling compatible iOS ── */
+var zxingReader = null;
+var zxingReadyPromise = null;
+var scanBusy = false;
+
+function cargarZXing() {
+  if (window.ZXingBrowser) return Promise.resolve();
+
+  if (zxingReadyPromise) return zxingReadyPromise;
+
+  zxingReadyPromise = new Promise(function(resolve, reject) {
+    var existing = document.querySelector('script[data-zxing="browser"]');
+    if (existing) {
+      existing.addEventListener('load', resolve);
+      existing.addEventListener('error', reject);
+      return;
+    }
+
+    var script = document.createElement('script');
+    script.src = 'https://unpkg.com/@zxing/browser@0.1.5/umd/index.min.js';
+    script.async = true;
+    script.setAttribute('data-zxing', 'browser');
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+
+  return zxingReadyPromise;
+}
+
 function abrirCamara() {
   if (cameraOpen) { cerrarCamara(); return; }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    camStatus.textContent = 'Este navegador no permite usar la cámara.';
+    return;
+  }
 
   camWrap.classList.add('open');
   camBtn.classList.add('active');
@@ -328,91 +297,139 @@ function abrirCamara() {
   camStatus.textContent = 'Solicitando acceso a la cámara…';
 
   navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: 'environment' } },
+    video: {
+      facingMode: { ideal: 'environment' },
+      width: { ideal: 1280 },
+      height: { ideal: 720 }
+    },
     audio: false
   })
   .then(function(stream) {
     activeStream = stream;
     videoEl.srcObject = stream;
 
-    videoEl.onloadedmetadata = function() {
-      videoEl.play().then(function() {
-        camStatus.textContent = 'Apuntá la cámara al código de barras…';
-        onZXingReady(iniciarLector);
-      }).catch(function(e) {
-        camStatus.textContent = 'Error iniciando video: ' + e.message;
-      });
-    };
+    return videoEl.play();
+  })
+  .then(function() {
+    camStatus.textContent = 'Preparando lector…';
+
+    // En iOS a veces videoWidth/videoHeight tardan unos frames aunque play() ya resolvió.
+    esperarVideoListo(function() {
+      iniciarScanCanvas();
+    });
   })
   .catch(function(err) {
-    var msg = err.name==='NotAllowedError'
-      ? 'Permiso denegado. Habilitá la cámara en Ajustes > Safari.'
-      : 'Error: ' + err.message;
-    camStatus.textContent = msg;
+    camStatus.textContent = err && err.name === 'NotAllowedError'
+      ? 'Permiso denegado — habilitá la cámara en Ajustes > Safari.'
+      : 'Error de cámara: ' + (err && err.message ? err.message : err);
     cerrarCamara();
   });
 }
 
-function iniciarLector() {
-  // Usamos ZXing con decodeFromStream — compatible con iOS 16+
-  try {
-    zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
-    zxingReader.decodeFromStream(activeStream, videoEl, function(result, err) {
-      if (result) {
-        var code = result.getText();
-        inp.value = code.toUpperCase();
-        cerrarCamara();
-        search(code);
-      }
-      // err es normal cuando no hay código en el frame, no hacer nada
-    });
-  } catch(e) {
-    // Fallback: escaneo manual con canvas cada 400ms
-    camStatus.textContent = 'Modo alternativo — apuntá al código…';
-    iniciarScanCanvas();
+function esperarVideoListo(callback) {
+  var intentos = 0;
+
+  function check() {
+    if (!cameraOpen) return;
+
+    if (videoEl.readyState >= 2 && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+      callback();
+      return;
+    }
+
+    intentos++;
+    if (intentos > 80) {
+      camStatus.textContent = 'No se pudo iniciar el video. Cerrá y probá de nuevo.';
+      return;
+    }
+
+    setTimeout(check, 100);
   }
+
+  check();
 }
 
 function iniciarScanCanvas() {
-  var ctx = canvasEl.getContext('2d');
-  var codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+  cargarZXing()
+    .then(function() {
+      if (!cameraOpen) return;
 
-  scanInterval = setInterval(function() {
-    if (!activeStream || !videoEl.videoWidth) return;
-    canvasEl.width  = videoEl.videoWidth;
-    canvasEl.height = videoEl.videoHeight;
-    ctx.drawImage(videoEl, 0, 0);
+      zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
 
-    canvasEl.toBlob(function(blob) {
-      if (!blob) return;
-      var url = URL.createObjectURL(blob);
-      var img = new Image();
-      img.onload = function() {
+      var ctx = canvasEl.getContext('2d', { willReadFrequently: true });
+      scanBusy = false;
+      camStatus.textContent = 'Apuntá al código de barras…';
+
+      scanInterval = setInterval(function() {
+        if (!cameraOpen || !activeStream || scanBusy) return;
+        if (!videoEl.videoWidth || !videoEl.videoHeight) return;
+
+        scanBusy = true;
+
         try {
-          codeReader.decodeFromImageElement(img).then(function(result) {
-            URL.revokeObjectURL(url);
-            if (result) {
-              var code = result.getText();
+          // Bajamos el tamaño para que iOS no se ahogue procesando frames muy grandes.
+          var vw = videoEl.videoWidth;
+          var vh = videoEl.videoHeight;
+          var maxW = 960;
+          var scale = Math.min(1, maxW / vw);
+          var cw = Math.round(vw * scale);
+          var ch = Math.round(vh * scale);
+
+          canvasEl.width = cw;
+          canvasEl.height = ch;
+          ctx.drawImage(videoEl, 0, 0, cw, ch);
+
+          zxingReader.decodeFromCanvas(canvasEl)
+            .then(function(result) {
+              scanBusy = false;
+
+              if (!result) return;
+
+              var code = String(result.getText() || '').trim();
+              if (!code) return;
+
               inp.value = code.toUpperCase();
+              camStatus.textContent = 'Código leído: ' + code;
               cerrarCamara();
               search(code);
-            }
-          }).catch(function() { URL.revokeObjectURL(url); });
-        } catch(e) { URL.revokeObjectURL(url); }
-      };
-      img.src = url;
-    }, 'image/jpeg', 0.8);
-  }, 400);
+            })
+            .catch(function() {
+              // Normal: en la mayoría de los frames no hay código detectable.
+              scanBusy = false;
+            });
+        } catch(e) {
+          scanBusy = false;
+        }
+      }, 450);
+    })
+    .catch(function() {
+      camStatus.textContent = 'Error cargando lector. Tipeá el código manualmente.';
+    });
 }
 
 function cerrarCamara() {
-  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-  if (zxingReader) { try { zxingReader.reset(); } catch(e){} zxingReader = null; }
+  if (scanInterval) {
+    clearInterval(scanInterval);
+    scanInterval = null;
+  }
+
+  scanBusy = false;
+
+  if (zxingReader) {
+    try { zxingReader.reset(); } catch(e) {}
+    zxingReader = null;
+  }
+
   if (activeStream) {
-    try { activeStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e){}
+    try {
+      activeStream.getTracks().forEach(function(t) { t.stop(); });
+    } catch(e) {}
     activeStream = null;
   }
+
+  videoEl.pause();
   videoEl.srcObject = null;
+
   camWrap.classList.remove('open');
   camBtn.classList.remove('active');
   camBtn.querySelector('i').className = 'ti ti-camera';
@@ -425,9 +442,9 @@ camClose.addEventListener('click', cerrarCamara);
 /* ── Ordenamiento ── */
 function sortMatches(arr) {
   arr=arr.slice();
-  if(sortMode==='az')         arr.sort(function(a,b){return String(a.desc||a.codigo).localeCompare(String(b.desc||b.codigo),'es');});
-  else if(sortMode==='za')    arr.sort(function(a,b){return String(b.desc||b.codigo).localeCompare(String(a.desc||a.codigo),'es');});
-  else if(sortMode==='price_asc')  arr.sort(function(a,b){return finalPrice(a)-finalPrice(b);});
+  if(sortMode==='az') arr.sort(function(a,b){return String(a.desc||a.codigo).localeCompare(String(b.desc||b.codigo),'es');});
+  else if(sortMode==='za') arr.sort(function(a,b){return String(b.desc||b.codigo).localeCompare(String(a.desc||a.codigo),'es');});
+  else if(sortMode==='price_asc') arr.sort(function(a,b){return finalPrice(a)-finalPrice(b);});
   else if(sortMode==='price_desc') arr.sort(function(a,b){return finalPrice(b)-finalPrice(a);});
   else arr.sort(function(a,b){return Number(b.exist||0)-Number(a.exist||0);});
   return arr;
@@ -436,22 +453,18 @@ function sortMatches(arr) {
 /* ── Render sugerencias ── */
 function renderMatches(matches,t) {
   var sorted=sortMatches(matches);
-  var html=
-    '<div class="sort-bar">'+
-      '<button class="sort-btn '+(sortMode==='stock'?'active':'')+'" data-sort="stock">STOCK</button>'+
-      '<button class="sort-btn '+(sortMode==='az'?'active':'')+'" data-sort="az">A-Z</button>'+
-      '<button class="sort-btn '+(sortMode==='za'?'active':'')+'" data-sort="za">Z-A</button>'+
-      '<button class="sort-btn '+(sortMode==='price_asc'?'active':'')+'" data-sort="price_asc">$ MENOR</button>'+
-      '<button class="sort-btn '+(sortMode==='price_desc'?'active':'')+'" data-sort="price_desc">$ MAYOR</button>'+
-    '</div>'+
-    '<div class="count-label">'+sorted.length.toLocaleString('es-AR')+' artículos encontrados</div>';
+  var html='<div class="sort-bar">'+
+    '<button class="sort-btn '+(sortMode==='stock'?'active':'')+'" data-sort="stock">STOCK</button>'+
+    '<button class="sort-btn '+(sortMode==='az'?'active':'')+'" data-sort="az">A-Z</button>'+
+    '<button class="sort-btn '+(sortMode==='za'?'active':'')+'" data-sort="za">Z-A</button>'+
+    '<button class="sort-btn '+(sortMode==='price_asc'?'active':'')+'" data-sort="price_asc">$ MENOR</button>'+
+    '<button class="sort-btn '+(sortMode==='price_desc'?'active':'')+'" data-sort="price_desc">$ MAYOR</button>'+
+    '</div><div class="count-label">'+sorted.length.toLocaleString('es-AR')+' artículos encontrados</div>';
   html+=sorted.map(function(s){
     var ph=hasPromo(s)?'<span class="sug-old-price">'+ars(s.pvp)+'</span><span class="sug-discount">'+esc(discountText(s))+'</span>':'';
-    return '<button class="sug-row" data-codigo="'+esc(s.codigo)+'">'+
-      thumbHtml(s)+
+    return '<button class="sug-row" data-codigo="'+esc(s.codigo)+'">'+thumbHtml(s)+
       '<div class="sug-left"><span class="sug-desc">'+(hl(s.desc,t)||esc(s.codigo))+'</span><span class="sug-code">'+esc(s.cat||'')+' / '+hl(s.codigo,t)+'</span></div>'+
-      '<div class="sug-right"><span class="sug-price">'+ars(finalPrice(s))+'</span>'+ph+'</div>'+
-    '</button>';
+      '<div class="sug-right"><span class="sug-price">'+ars(finalPrice(s))+'</span>'+ph+'</div></button>';
   }).join('');
   sugsEl.innerHTML=html; sugsEl.style.display='block';
   sugsEl.querySelectorAll('.sort-btn').forEach(function(btn){
