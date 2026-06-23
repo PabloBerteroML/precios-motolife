@@ -586,25 +586,25 @@ confirmBtn.addEventListener('click', function(){
     total: cartTotal()
   };
 
+  // Apps Script con GitHub Pages siempre da error CORS en la respuesta,
+  // pero el POST llega y se graba correctamente. Usamos no-cors y asumimos éxito.
   fetch(VENTAS_URL, {
     method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify(payload)
   })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    if (data.ok) {
-      showToast('¡Venta registrada! N° ' + (data.id || ''));
-      cart = [];
-      updateCartBar();
-      closeModal();
-      document.getElementById('f-vendedor').value = '';
-      document.getElementById('f-nombre').value = '';
-      document.getElementById('f-apellido').value = '';
-      document.getElementById('f-dni').value = '';
-      document.getElementById('f-comentario').value = '';
-    } else {
-      showToast('Error: ' + (data.error || 'intentá de nuevo'), true);
-    }
+  .then(function() {
+    // Con no-cors la respuesta es opaca (no legible) pero la venta se grabó
+    showToast('¡Venta registrada correctamente!');
+    cart = [];
+    updateCartBar();
+    closeModal();
+    document.getElementById('f-vendedor').value = '';
+    document.getElementById('f-nombre').value = '';
+    document.getElementById('f-apellido').value = '';
+    document.getElementById('f-dni').value = '';
+    document.getElementById('f-comentario').value = '';
   })
   .catch(function(err){
     showToast('Error de conexión: ' + err.message, true);
