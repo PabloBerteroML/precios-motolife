@@ -815,15 +815,69 @@ var style=document.createElement('style');
 style.textContent='@keyframes spin{to{transform:rotate(360deg)}}';
 document.head.appendChild(style);
 
-/* ── Carga de datos ── */
-fetch(API_URL)
-  .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
-  .then(function(data){
-    items=Array.isArray(data)?data:[];
-    statusEl.textContent=items.length.toLocaleString('es-AR')+' artículos listos';
-    dotEl.className='dot ok'; inp.disabled=false; inp.focus();
-  })
-  .catch(function(err){statusEl.textContent='Error al cargar: '+err.message;dotEl.className='dot err';});
+/* ── Carga de datos con caché local ── */
+var CACHE_KEY_LS  = 'motolife_precios_v1';
+var CACHE_TTL_MS  = 4 * 60 * 60 * 1000; // 4 horas en ms
+
+function cargarItems(data) {
+  items = Array.isArray(data) ? data : [];
+  statusEl.textContent = items.length.toLocaleString('es-AR') + ' artículos listos';
+  dotEl.className = 'dot ok';
+  inp.disabled = false;
+  inp.focus();
+}
+
+function fetchFresh() {
+  statusEl.textContent = 'Actualizando artículos…';
+  fetch(API_URL)
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(data){
+      try {
+        localStorage.setItem(CACHE_KEY_LS, JSON.stringify({
+          ts: Date.now(),
+          data: data
+        }));
+      } catch(e) {}
+      cargarItems(data);
+    })
+    .catch(function(err){
+      // Si hay caché viejo, usarlo igual con aviso
+      var cached = null;
+      try { cached = JSON.parse(localStorage.getItem(CACHE_KEY_LS)); } catch(e){}
+      if (cached && cached.data) {
+        cargarItems(cached.data);
+        statusEl.textContent = items.length.toLocaleString('es-AR') + ' artículos (sin conexión)';
+      } else {
+        statusEl.textContent = 'Error al cargar: ' + err.message;
+        dotEl.className = 'dot err';
+      }
+    });
+}
+
+// Intentar usar caché primero
+(function() {
+  var cached = null;
+  try { cached = JSON.parse(localStorage.getItem(CACHE_KEY_LS)); } catch(e){}
+
+  if (cached && cached.data && (Date.now() - cached.ts) < CACHE_TTL_MS) {
+    // Caché fresco: mostrar al instante
+    cargarItems(cached.data);
+    // Refrescar en background silenciosamente cada vez que el caché tenga más de 30min
+    if ((Date.now() - cached.ts) > 30 * 60 * 1000) {
+      fetch(API_URL)
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(data){
+          if (data) {
+            try { localStorage.setItem(CACHE_KEY_LS, JSON.stringify({ts:Date.now(),data:data})); } catch(e){}
+            items = Array.isArray(data) ? data : [];
+          }
+        }).catch(function(){});
+    }
+  } else {
+    // Sin caché o caché vencido: fetch normal
+    fetchFresh();
+  }
+})();
 </script>
 </body>
 </html>
