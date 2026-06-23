@@ -527,10 +527,19 @@ function openModal() {
   renderCartModal();
   modalOverlay.classList.add('open');
   document.body.style.overflow = 'hidden';
+  // Deshabilitar el input de búsqueda para que no robe el foco
+  inp.disabled = true;
+  // Enfocar el primer campo del formulario tras la animación
+  setTimeout(function() {
+    var sel = document.getElementById('f-vendedor');
+    if (sel) sel.focus();
+  }, 100);
 }
 function closeModal() {
   modalOverlay.classList.remove('open');
   document.body.style.overflow = '';
+  // Rehabilitar el input de búsqueda
+  inp.disabled = false;
 }
 
 cartBar.addEventListener('click', openModal);
