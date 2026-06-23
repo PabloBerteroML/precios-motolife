@@ -100,6 +100,127 @@
   .stock-low  { background:rgba(183,121,31,.13); color:var(--yellow); }
   .stock-zero { background:rgba(180,35,24,.10);  color:var(--red); }
   .result-stock i { font-size:21px; }
+
+  /* ── Botón agregar al carrito ── */
+  .add-to-cart-btn {
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; padding:18px 24px; margin-top:0;
+    background:var(--orange); color:#fff; border:none;
+    font-size:17px; font-weight:900; cursor:pointer;
+    letter-spacing:.02em; transition:background .15s;
+    border-top:1px solid var(--border);
+  }
+  .add-to-cart-btn:hover { background:#d96a10; }
+  .add-to-cart-btn i { font-size:22px; }
+
+  /* ── Carrito flotante ── */
+  #cart-bar {
+    display:none; position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    z-index:100; background:var(--black); color:#fff;
+    border-radius:999px; padding:14px 22px;
+    box-shadow:0 8px 32px rgba(0,0,0,.35);
+    align-items:center; gap:14px; cursor:pointer;
+    font-weight:900; font-size:16px; white-space:nowrap;
+    border:2px solid var(--orange);
+    transition: transform .2s;
+  }
+  #cart-bar.visible { display:flex; }
+  #cart-bar:hover { transform:translateX(-50%) scale(1.03); }
+  #cart-bar i { font-size:22px; color:var(--orange); }
+  #cart-count-badge {
+    background:var(--orange); color:#fff; border-radius:50%;
+    width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:900;
+  }
+
+  /* ── Modal carrito ── */
+  .modal-overlay {
+    display:none; position:fixed; inset:0; z-index:200;
+    background:rgba(0,0,0,.55); align-items:flex-end; justify-content:center;
+  }
+  .modal-overlay.open { display:flex; }
+  .modal-box {
+    background:#fff; border-radius:24px 24px 0 0;
+    width:100%; max-width:680px; max-height:92vh;
+    overflow-y:auto; padding:0 0 32px;
+    box-shadow:0 -8px 40px rgba(0,0,0,.2);
+  }
+  .modal-header {
+    position:sticky; top:0; z-index:10;
+    background:#fff; padding:20px 24px 16px;
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .modal-title { font-size:20px; font-weight:900; color:var(--black); display:flex; align-items:center; gap:10px; }
+  .modal-title i { color:var(--orange); font-size:24px; }
+  .modal-close { background:none; border:none; cursor:pointer; padding:6px; color:var(--text3); border-radius:8px; }
+  .modal-close:hover { background:var(--bg3); }
+  .modal-close i { font-size:22px; }
+  .modal-section { padding:20px 24px 0; }
+  .modal-section-title { font-size:13px; font-weight:900; color:var(--text3); text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; }
+
+  /* Ítems del carrito */
+  .cart-item {
+    display:flex; align-items:center; gap:12px;
+    padding:14px 0; border-bottom:1px solid var(--border);
+  }
+  .cart-item:last-child { border-bottom:none; }
+  .cart-item-info { flex:1; min-width:0; }
+  .cart-item-desc { font-size:15px; font-weight:800; color:var(--black); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cart-item-code { font-size:12px; font-family:var(--mono); color:var(--text3); margin-top:2px; }
+  .cart-item-price { font-size:16px; font-weight:900; color:var(--orange); white-space:nowrap; }
+  .qty-ctrl { display:flex; align-items:center; gap:6px; }
+  .qty-btn { width:30px; height:30px; border-radius:50%; border:2px solid var(--border2); background:#fff; cursor:pointer; font-size:18px; font-weight:900; color:var(--orange); display:flex; align-items:center; justify-content:center; line-height:1; }
+  .qty-btn:hover { background:var(--info-bg); }
+  .qty-num { font-size:15px; font-weight:900; min-width:20px; text-align:center; }
+  .remove-btn { background:none; border:none; cursor:pointer; color:var(--text3); padding:4px; border-radius:6px; }
+  .remove-btn:hover { color:var(--red); background:rgba(180,35,24,.08); }
+  .remove-btn i { font-size:20px; }
+
+  /* Total */
+  .cart-total-row {
+    margin:16px 24px 0; padding:16px 20px; background:var(--info-bg);
+    border-radius:14px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .cart-total-label { font-size:14px; font-weight:800; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; }
+  .cart-total-val { font-size:30px; font-weight:950; color:var(--orange); letter-spacing:-1px; }
+
+  /* Formulario de venta */
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .form-group { display:flex; flex-direction:column; gap:6px; }
+  .form-group.full { grid-column:1/-1; }
+  .form-label { font-size:13px; font-weight:800; color:var(--text2); }
+  .form-input {
+    padding:12px 14px; border:2px solid var(--border); border-radius:12px;
+    font-size:15px; font-family:inherit; color:var(--black); background:#fff; outline:none;
+    transition:border-color .15s;
+  }
+  .form-input:focus { border-color:var(--orange); box-shadow:0 0 0 3px rgba(244,123,32,.15); }
+  select.form-input { cursor:pointer; }
+
+  /* Botón confirmar */
+  .confirm-btn {
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    width:100%; padding:18px; margin-top:20px;
+    background:var(--orange); color:#fff; border:none; border-radius:14px;
+    font-size:17px; font-weight:900; cursor:pointer; transition:background .15s;
+  }
+  .confirm-btn:hover { background:#d96a10; }
+  .confirm-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .confirm-btn i { font-size:22px; }
+
+  /* Toast */
+  #toast {
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--green); color:#fff; padding:14px 22px; border-radius:999px;
+    font-size:15px; font-weight:800; z-index:300; opacity:0;
+    transition:opacity .3s, transform .3s; pointer-events:none; white-space:nowrap;
+    display:flex; align-items:center; gap:8px;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #toast.error { background:var(--red); }
+  #toast i { font-size:18px; }
+
   #empty { margin-top:16px; text-align:center; padding:44px 0; display:none; }
   #empty i { font-size:46px; color:var(--orange); display:block; margin-bottom:12px; }
   #empty p { font-size:17px; color:var(--text2); font-weight:700; }
@@ -107,6 +228,7 @@
   #ts { margin-top:16px; font-size:13px; color:var(--text3); text-align:right; display:none; }
   mark { background:var(--warn-bg); color:var(--black); border-radius:3px; padding:0 3px; }
   footer { margin-top:28px; font-size:13px; color:var(--text3); text-align:center; }
+
   @media(max-width:640px){
     body{padding:0 10px 34px;}
     header{padding:20px 0 14px;max-width:100%;}
@@ -122,6 +244,10 @@
     .sug-desc{font-size:15px;} .sug-code{font-size:12px;}
     .sug-price{font-size:18px;} .sug-old-price{font-size:12px;}
     .result-desc{font-size:20px;} .price-val{font-size:52px;} .old-price{font-size:18px;}
+    .form-grid{grid-template-columns:1fr;}
+    .form-group.full{grid-column:1;}
+    .modal-box{border-radius:20px 20px 0 0;}
+    #cart-bar{bottom:16px; font-size:14px; padding:12px 18px;}
   }
 </style>
 </head>
@@ -178,16 +304,85 @@
 
 <footer>Precios con IVA incluido · Datos actualizados desde Google Sheets</footer>
 
-<!-- Librería local: subir este archivo al repo en /vendor/zxing-browser.js -->
+<!-- Carrito flotante -->
+<div id="cart-bar">
+  <i class="ti ti-shopping-cart"></i>
+  <span id="cart-bar-text">Ver carrito</span>
+  <span id="cart-count-badge">0</span>
+</div>
+
+<!-- Modal carrito + formulario -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box" id="modal-box">
+    <div class="modal-header">
+      <div class="modal-title"><i class="ti ti-shopping-cart"></i> Carrito de venta</div>
+      <button class="modal-close" id="modal-close"><i class="ti ti-x"></i></button>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-title">Artículos</div>
+      <div id="cart-items-list"></div>
+    </div>
+
+    <div class="cart-total-row">
+      <span class="cart-total-label">Total</span>
+      <span class="cart-total-val" id="cart-total-val">$ 0</span>
+    </div>
+
+    <div class="modal-section" style="margin-top:20px;">
+      <div class="modal-section-title">Datos de la venta</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Vendedor *</label>
+          <select class="form-input" id="f-vendedor">
+            <option value="">— Seleccioná —</option>
+            <option>Pablo</option>
+            <option>Nicolás</option>
+            <option>José</option>
+            <option>Pamela</option>
+            <option>Marcelo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nombre *</label>
+          <input class="form-input" id="f-nombre" type="text" placeholder="Nombre del cliente" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Apellido *</label>
+          <input class="form-input" id="f-apellido" type="text" placeholder="Apellido del cliente" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">DNI *</label>
+          <input class="form-input" id="f-dni" type="text" inputmode="numeric" placeholder="Sin puntos" autocomplete="off">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Comentario (opcional)</label>
+          <input class="form-input" id="f-comentario" type="text" placeholder="Ej: cliente de moto RE Himalayan, paga con débito…" autocomplete="off">
+        </div>
+      </div>
+      <button class="confirm-btn" id="confirm-btn">
+        <i class="ti ti-check"></i> Confirmar venta
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"><i class="ti ti-check"></i> <span id="toast-msg"></span></div>
+
 <script src="./vendor/zxing-browser.js"></script>
 
 <script>
-var API_URL = 'https://script.google.com/macros/s/AKfycbwFYU8jpF7mXw75TC7XbiXH6iwuy8GPz1YZEQxglY1CxcaR89voBoAYj_sjoWoEZMo/exec?action=precios';
+// ─────────────────────────────────────────────
+// CONFIGURACIÓN — ajustá esta URL con la de tu
+// Apps Script (la misma o una nueva)
+// ─────────────────────────────────────────────
+var API_URL    = 'https://script.google.com/macros/s/AKfycbwFYU8jpF7mXw75TC7XbiXH6iwuy8GPz1YZEQxglY1CxcaR89voBoAYj_sjoWoEZMo/exec?action=precios';
+var VENTAS_URL = 'https://script.google.com/macros/s/TU_DEPLOYMENT_ID_AQUI/exec'; // ← reemplazá con la URL del Apps Script de ventas
 
 var items = [], debounceTimer, currentMatches = [], sortMode = 'stock';
-var cameraOpen = false;
-var activeStream = null;
-var scanInterval = null;
+var cameraOpen = false, activeStream = null, scanInterval = null;
+var cart = []; // [{item, qty}]
 
 var inp       = document.getElementById('inp');
 var clrBtn    = document.getElementById('clr-btn');
@@ -204,6 +399,14 @@ var camClose  = document.getElementById('cam-close');
 var camStatus = document.getElementById('cam-status');
 var videoEl   = document.getElementById('cam-video');
 var canvasEl  = document.getElementById('cam-canvas');
+var cartBar      = document.getElementById('cart-bar');
+var cartBadge    = document.getElementById('cart-count-badge');
+var cartBarText  = document.getElementById('cart-bar-text');
+var modalOverlay = document.getElementById('modal-overlay');
+var modalClose   = document.getElementById('modal-close');
+var confirmBtn   = document.getElementById('confirm-btn');
+var toastEl      = document.getElementById('toast');
+var toastMsg     = document.getElementById('toast-msg');
 
 /* ── Utilidades ── */
 function ars(n) {
@@ -233,6 +436,164 @@ function thumbHtml(item) {
   return '<div class="sug-thumb-placeholder"><i class="ti ti-shirt"></i></div>';
 }
 
+/* ── Toast ── */
+function showToast(msg, isError) {
+  toastMsg.textContent = msg;
+  toastEl.className = 'show' + (isError ? ' error' : '');
+  toastEl.querySelector('i').className = isError ? 'ti ti-alert-circle' : 'ti ti-check';
+  setTimeout(function(){ toastEl.className = ''; }, 3200);
+}
+
+/* ── Carrito ── */
+function cartTotal() {
+  return cart.reduce(function(sum, e){ return sum + finalPrice(e.item) * e.qty; }, 0);
+}
+function cartTotalItems() {
+  return cart.reduce(function(sum, e){ return sum + e.qty; }, 0);
+}
+function updateCartBar() {
+  var total = cartTotalItems();
+  if (total === 0) {
+    cartBar.classList.remove('visible');
+  } else {
+    cartBar.classList.add('visible');
+    cartBadge.textContent = total;
+    cartBarText.textContent = ars(cartTotal());
+  }
+}
+function addToCart(item) {
+  var found = null;
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i].item.codigo === item.codigo) { found = cart[i]; break; }
+  }
+  if (found) { found.qty++; } else { cart.push({item: item, qty: 1}); }
+  updateCartBar();
+  showToast('Agregado: ' + (item.desc || item.codigo));
+}
+function removeFromCart(codigo) {
+  cart = cart.filter(function(e){ return e.item.codigo !== codigo; });
+  updateCartBar();
+  renderCartModal();
+}
+function changeQty(codigo, delta) {
+  for (var i = 0; i < cart.length; i++) {
+    if (cart[i].item.codigo === codigo) {
+      cart[i].qty += delta;
+      if (cart[i].qty <= 0) { cart.splice(i, 1); }
+      break;
+    }
+  }
+  updateCartBar();
+  renderCartModal();
+  if (cart.length === 0) closeModal();
+}
+
+function renderCartModal() {
+  var listEl = document.getElementById('cart-items-list');
+  var totalEl = document.getElementById('cart-total-val');
+  if (cart.length === 0) { listEl.innerHTML = '<p style="color:var(--text3);font-size:14px;padding:12px 0;">El carrito está vacío.</p>'; totalEl.textContent = ars(0); return; }
+  listEl.innerHTML = cart.map(function(e){
+    var promo = hasPromo(e.item) ? '<span style="font-size:11px;color:var(--text3);text-decoration:line-through;margin-left:4px;">'+ars(e.item.pvp)+'</span>' : '';
+    return '<div class="cart-item">'+
+      '<div class="cart-item-info">'+
+        '<div class="cart-item-desc">'+esc(e.item.desc||e.item.codigo)+'</div>'+
+        '<div class="cart-item-code">'+esc(e.item.codigo)+'</div>'+
+      '</div>'+
+      '<div class="qty-ctrl">'+
+        '<button class="qty-btn" onclick="changeQty(\''+esc(e.item.codigo)+'\', -1)">−</button>'+
+        '<span class="qty-num">'+e.qty+'</span>'+
+        '<button class="qty-btn" onclick="changeQty(\''+esc(e.item.codigo)+'\', +1)">+</button>'+
+      '</div>'+
+      '<div class="cart-item-price">'+ars(finalPrice(e.item) * e.qty)+promo+'</div>'+
+      '<button class="remove-btn" onclick="removeFromCart(\''+esc(e.item.codigo)+'\')"><i class="ti ti-trash"></i></button>'+
+    '</div>';
+  }).join('');
+  totalEl.textContent = ars(cartTotal());
+}
+
+function openModal() {
+  renderCartModal();
+  modalOverlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  modalOverlay.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+cartBar.addEventListener('click', openModal);
+modalClose.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', function(e){ if(e.target===modalOverlay) closeModal(); });
+
+/* ── Confirmar venta ── */
+confirmBtn.addEventListener('click', function(){
+  var vendedor  = document.getElementById('f-vendedor').value.trim();
+  var nombre    = document.getElementById('f-nombre').value.trim();
+  var apellido  = document.getElementById('f-apellido').value.trim();
+  var dni       = document.getElementById('f-dni').value.trim();
+  var comentario= document.getElementById('f-comentario').value.trim();
+
+  if (!vendedor || !nombre || !apellido || !dni) {
+    showToast('Completá todos los campos obligatorios', true); return;
+  }
+  if (cart.length === 0) {
+    showToast('El carrito está vacío', true); return;
+  }
+
+  confirmBtn.disabled = true;
+  confirmBtn.innerHTML = '<i class="ti ti-loader" style="animation:spin .8s linear infinite"></i> Enviando…';
+
+  var payload = {
+    action:    'nuevaVenta',
+    vendedor:  vendedor,
+    nombre:    nombre,
+    apellido:  apellido,
+    dni:       dni,
+    comentario:comentario,
+    items: cart.map(function(e){
+      return {
+        codigo:    e.item.codigo,
+        desc:      e.item.desc || '',
+        cat:       e.item.cat  || '',
+        pvp:       e.item.pvp,
+        promo:     e.item.promo || '',
+        precioFinal: finalPrice(e.item),
+        qty:       e.qty,
+        subtotal:  finalPrice(e.item) * e.qty
+      };
+    }),
+    total: cartTotal()
+  };
+
+  fetch(VENTAS_URL, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (data.ok) {
+      showToast('¡Venta registrada! N° ' + (data.id || ''));
+      cart = [];
+      updateCartBar();
+      closeModal();
+      document.getElementById('f-vendedor').value = '';
+      document.getElementById('f-nombre').value = '';
+      document.getElementById('f-apellido').value = '';
+      document.getElementById('f-dni').value = '';
+      document.getElementById('f-comentario').value = '';
+    } else {
+      showToast('Error: ' + (data.error || 'intentá de nuevo'), true);
+    }
+  })
+  .catch(function(err){
+    showToast('Error de conexión: ' + err.message, true);
+  })
+  .finally(function(){
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = '<i class="ti ti-check"></i> Confirmar venta';
+  });
+});
+
 /* ── UI ── */
 function hideAll() { sugsEl.style.display='none'; resEl.style.display='none'; empEl.style.display='none'; }
 function clearAll() { inp.value=''; clrBtn.style.display='none'; currentMatches=[]; hideAll(); inp.focus(); }
@@ -255,223 +616,90 @@ document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&isScanningGun){isScanningGun=false;clearTimeout(debounceTimer);search(inp.value);}
 });
 
-/* ── Cámara con canvas polling robusto para iOS ── */
-var zxingLoadPromise = null;
-var zxingReader = null;
-var scanBusy = false;
-var detector = null;
+/* ── Cámara ── */
+var zxingReader = null, scanBusy = false, detector = null;
 
 function cargarZXing() {
-  // ZXing ya no se descarga desde CDN en runtime.
-  // Debe estar subido al repo como /vendor/zxing-browser.js
   if (window.ZXingBrowser) return Promise.resolve();
-  return Promise.reject(new Error('ZXing local no cargó. Verificá que exista ./vendor/zxing-browser.js'));
+  return Promise.reject(new Error('ZXing local no cargó.'));
 }
-
 function abrirCamara() {
   if (cameraOpen) { cerrarCamara(); return; }
-
-  camWrap.classList.add('open');
-  camBtn.classList.add('active');
-  camBtn.querySelector('i').className = 'ti ti-camera-off';
-  cameraOpen = true;
-  camStatus.textContent = 'Solicitando acceso a la cámara…';
-
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    camStatus.textContent = 'Este navegador no permite usar la cámara.';
-    return;
-  }
-
-  navigator.mediaDevices.getUserMedia({
-    video: {
-      facingMode: { ideal: 'environment' },
-      width: { ideal: 1280 },
-      height: { ideal: 720 }
-    },
-    audio: false
-  })
-  .then(function(stream) {
-    activeStream = stream;
-    videoEl.srcObject = stream;
-
-    videoEl.onloadedmetadata = function() {
-      videoEl.play().then(function() {
-        camStatus.textContent = 'Cámara lista. Cargando lector…';
-        iniciarScanCanvas();
-      }).catch(function(e) {
-        camStatus.textContent = 'Error de video: ' + e.message;
-      });
+  camWrap.classList.add('open'); camBtn.classList.add('active');
+  camBtn.querySelector('i').className='ti ti-camera-off';
+  cameraOpen=true; camStatus.textContent='Solicitando acceso a la cámara…';
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){camStatus.textContent='Este navegador no permite usar la cámara.';return;}
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false})
+  .then(function(stream){
+    activeStream=stream; videoEl.srcObject=stream;
+    videoEl.onloadedmetadata=function(){
+      videoEl.play().then(function(){camStatus.textContent='Cámara lista. Cargando lector…';iniciarScanCanvas();}).catch(function(e){camStatus.textContent='Error de video: '+e.message;});
     };
-  })
-  .catch(function(err) {
-    camStatus.textContent = err.name === 'NotAllowedError'
-      ? 'Permiso denegado — habilitá la cámara en Ajustes > Safari.'
-      : 'Error cámara: ' + err.message;
-  });
+  }).catch(function(err){camStatus.textContent=err.name==='NotAllowedError'?'Permiso denegado — habilitá la cámara en Ajustes > Safari.':'Error cámara: '+err.message;});
 }
-
-function prepararBarcodeDetector() {
-  try {
-    if ('BarcodeDetector' in window) {
-      detector = new BarcodeDetector({
-        formats: ['ean_13','ean_8','code_128','code_39','code_93','upc_a','upc_e','itf']
-      });
-    }
-  } catch(e) {
-    detector = null;
-  }
-}
-
-function iniciarScanCanvas() {
+function prepararBarcodeDetector(){try{if('BarcodeDetector' in window){detector=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','code_93','upc_a','upc_e','itf']});}}catch(e){detector=null;}}
+function iniciarScanCanvas(){
   prepararBarcodeDetector();
-
-  cargarZXing().then(function() {
-    try {
-      zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
-      camStatus.textContent = 'Apuntá al código. Mantenelo horizontal y bien iluminado…';
-      iniciarLoopEscaneo();
-    } catch(e) {
-      camStatus.textContent = 'El lector cargó, pero no pudo iniciar: ' + e.message;
-    }
-  }).catch(function() {
-    if (detector) {
-      camStatus.textContent = 'ZXing no cargó. Probando lector nativo del navegador…';
-      iniciarLoopEscaneo();
-    } else {
-      camStatus.textContent = 'No se pudo cargar el lector local. Verificá /vendor/zxing-browser.js o tipeá el código.';
-    }
+  cargarZXing().then(function(){
+    try{zxingReader=new ZXingBrowser.BrowserMultiFormatReader();camStatus.textContent='Apuntá al código. Mantenelo horizontal y bien iluminado…';iniciarLoopEscaneo();}
+    catch(e){camStatus.textContent='El lector cargó, pero no pudo iniciar: '+e.message;}
+  }).catch(function(){
+    if(detector){camStatus.textContent='ZXing no cargó. Probando lector nativo…';iniciarLoopEscaneo();}
+    else{camStatus.textContent='No se pudo cargar el lector local.';}
   });
 }
-
-function iniciarLoopEscaneo() {
-  var ctx = canvasEl.getContext('2d', { willReadFrequently: true });
-
-  scanInterval = setInterval(function() {
-    if (!cameraOpen || scanBusy || !videoEl.videoWidth || !videoEl.videoHeight) return;
-    scanBusy = true;
-
-    try {
-      var vw = videoEl.videoWidth;
-      var vh = videoEl.videoHeight;
-
-      // Para códigos de barras 1D conviene leer una franja central, no todo el video.
-      var cropX = Math.round(vw * 0.05);
-      var cropW = Math.round(vw * 0.90);
-      var cropH = Math.round(vh * 0.34);
-      var cropY = Math.round((vh - cropH) / 2);
-
-      var maxW = 900;
-      var scale = cropW > maxW ? maxW / cropW : 1;
-      canvasEl.width = Math.round(cropW * scale);
-      canvasEl.height = Math.round(cropH * scale);
-
-      ctx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, canvasEl.width, canvasEl.height);
-
-      // Aumentar contraste simple para iOS/Safari y códigos impresos con poco foco.
-      var img = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
-      var data = img.data;
-      for (var i = 0; i < data.length; i += 4) {
-        var gray = (data[i] * 0.299 + data[i+1] * 0.587 + data[i+2] * 0.114);
-        var v = gray > 145 ? 255 : 0;
-        data[i] = data[i+1] = data[i+2] = v;
-      }
-      ctx.putImageData(img, 0, 0);
-
-      leerCanvas().then(function(code) {
-        scanBusy = false;
-        if (code) codigoDetectado(code);
-      }).catch(function() {
-        scanBusy = false;
-      });
-    } catch(e) {
-      scanBusy = false;
-      camStatus.textContent = 'Error escaneando frame: ' + e.message;
-    }
-  }, 500);
+function iniciarLoopEscaneo(){
+  var ctx=canvasEl.getContext('2d',{willReadFrequently:true});
+  scanInterval=setInterval(function(){
+    if(!cameraOpen||scanBusy||!videoEl.videoWidth||!videoEl.videoHeight) return;
+    scanBusy=true;
+    try{
+      var vw=videoEl.videoWidth,vh=videoEl.videoHeight;
+      var cropX=Math.round(vw*.05),cropW=Math.round(vw*.90),cropH=Math.round(vh*.34),cropY=Math.round((vh-cropH)/2);
+      var maxW=900,scale=cropW>maxW?maxW/cropW:1;
+      canvasEl.width=Math.round(cropW*scale); canvasEl.height=Math.round(cropH*scale);
+      ctx.drawImage(videoEl,cropX,cropY,cropW,cropH,0,0,canvasEl.width,canvasEl.height);
+      var img=ctx.getImageData(0,0,canvasEl.width,canvasEl.height),data=img.data;
+      for(var i=0;i<data.length;i+=4){var gray=(data[i]*.299+data[i+1]*.587+data[i+2]*.114);var v=gray>145?255:0;data[i]=data[i+1]=data[i+2]=v;}
+      ctx.putImageData(img,0,0);
+      leerCanvas().then(function(code){scanBusy=false;if(code)codigoDetectado(code);}).catch(function(){scanBusy=false;});
+    }catch(e){scanBusy=false;}
+  },500);
 }
-
-function leerCanvas() {
-  // 1) Intentar BarcodeDetector nativo si el navegador lo trae.
-  if (detector) {
-    return detector.detect(canvasEl).then(function(codes) {
-      if (codes && codes.length && codes[0].rawValue) return codes[0].rawValue;
-      return leerCanvasZXing();
-    }).catch(function() {
-      return leerCanvasZXing();
-    });
-  }
+function leerCanvas(){
+  if(detector){return detector.detect(canvasEl).then(function(codes){if(codes&&codes.length&&codes[0].rawValue)return codes[0].rawValue;return leerCanvasZXing();}).catch(function(){return leerCanvasZXing();});}
   return leerCanvasZXing();
 }
-
-function leerCanvasZXing() {
-  if (!zxingReader) return Promise.resolve('');
-
-  // Compatibilidad: en algunas versiones de ZXing estos metodos devuelven Promise,
-  // y en otras devuelven el resultado en forma sincronica. Por eso envolvemos con Promise.resolve().
-  if (typeof zxingReader.decodeFromCanvas === 'function') {
-    try {
-      return Promise.resolve(zxingReader.decodeFromCanvas(canvasEl)).then(function(result) {
-        return result && typeof result.getText === 'function' ? result.getText() : '';
-      }).catch(function() {
-        return '';
-      });
-    } catch(e) {
-      return Promise.resolve('');
-    }
+function leerCanvasZXing(){
+  if(!zxingReader) return Promise.resolve('');
+  if(typeof zxingReader.decodeFromCanvas==='function'){
+    try{return Promise.resolve(zxingReader.decodeFromCanvas(canvasEl)).then(function(r){return r&&typeof r.getText==='function'?r.getText():'';}).catch(function(){return '';});}catch(e){return Promise.resolve('');}
   }
-
-  if (typeof zxingReader.decodeFromImageElement === 'function') {
-    return new Promise(function(resolve) {
-      var img = new Image();
-      img.onload = function() {
-        try {
-          Promise.resolve(zxingReader.decodeFromImageElement(img)).then(function(result) {
-            resolve(result && typeof result.getText === 'function' ? result.getText() : '');
-          }).catch(function() {
-            resolve('');
-          });
-        } catch(e) {
-          resolve('');
-        }
-      };
-      img.onerror = function() { resolve(''); };
-      img.src = canvasEl.toDataURL('image/png');
+  if(typeof zxingReader.decodeFromImageElement==='function'){
+    return new Promise(function(resolve){
+      var img=new Image();
+      img.onload=function(){try{Promise.resolve(zxingReader.decodeFromImageElement(img)).then(function(r){resolve(r&&typeof r.getText==='function'?r.getText():'');}).catch(function(){resolve('');});}catch(e){resolve('');}};
+      img.onerror=function(){resolve('');};
+      img.src=canvasEl.toDataURL('image/png');
     });
   }
-
   return Promise.resolve('');
 }
-
-function codigoDetectado(code) {
-  code = String(code || '').trim();
-  if (!code) return;
-  inp.value = code.toUpperCase();
-  cerrarCamara();
-  search(code);
+function codigoDetectado(code){code=String(code||'').trim();if(!code)return;inp.value=code.toUpperCase();cerrarCamara();search(code);}
+function cerrarCamara(){
+  if(scanInterval){clearInterval(scanInterval);scanInterval=null;}
+  scanBusy=false;
+  if(zxingReader&&zxingReader.reset){try{zxingReader.reset();}catch(e){}}
+  if(activeStream){try{activeStream.getTracks().forEach(function(t){t.stop();});}catch(e){}activeStream=null;}
+  videoEl.srcObject=null;
+  camWrap.classList.remove('open'); camBtn.classList.remove('active');
+  camBtn.querySelector('i').className='ti ti-camera'; cameraOpen=false;
 }
-
-function cerrarCamara() {
-  if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-  scanBusy = false;
-  if (zxingReader && zxingReader.reset) {
-    try { zxingReader.reset(); } catch(e) {}
-  }
-  if (activeStream) {
-    try { activeStream.getTracks().forEach(function(t){ t.stop(); }); } catch(e) {}
-    activeStream = null;
-  }
-  videoEl.srcObject = null;
-  camWrap.classList.remove('open');
-  camBtn.classList.remove('active');
-  camBtn.querySelector('i').className = 'ti ti-camera';
-  cameraOpen = false;
-}
-
-camBtn.addEventListener('click', abrirCamara);
-camClose.addEventListener('click', cerrarCamara);
+camBtn.addEventListener('click',abrirCamara);
+camClose.addEventListener('click',cerrarCamara);
 
 /* ── Ordenamiento ── */
-function sortMatches(arr) {
+function sortMatches(arr){
   arr=arr.slice();
   if(sortMode==='az') arr.sort(function(a,b){return String(a.desc||a.codigo).localeCompare(String(b.desc||b.codigo),'es');});
   else if(sortMode==='za') arr.sort(function(a,b){return String(b.desc||b.codigo).localeCompare(String(a.desc||a.codigo),'es');});
@@ -482,7 +710,7 @@ function sortMatches(arr) {
 }
 
 /* ── Render sugerencias ── */
-function renderMatches(matches,t) {
+function renderMatches(matches,t){
   var sorted=sortMatches(matches);
   var html='<div class="sort-bar">'+
     '<button class="sort-btn '+(sortMode==='stock'?'active':'')+'" data-sort="stock">STOCK</button>'+
@@ -510,15 +738,15 @@ function renderMatches(matches,t) {
 }
 
 /* ── Búsqueda ── */
-function search(q) {
+function search(q){
   var t=q.trim(); hideAll();
   if(!t){clrBtn.style.display='none';currentMatches=[];return;}
   clrBtn.style.display='flex';
-  var tn=norm(t),tu=t.toUpperCase(),exact=null;
+  var tn=norm(t),exact=null;
   for(var i=0;i<items.length;i++){if(norm(items[i].codigo)===tn){exact=items[i];break;}}
   if(exact){currentMatches=[];showResult(exact);return;}
   var matches=items.filter(function(it){
-    return norm(it.codigo).indexOf(tn)!==-1||String(it.desc||'').toUpperCase().indexOf(tu)!==-1||String(it.cat||'').toUpperCase().indexOf(tu)!==-1;
+    return norm(it.codigo).indexOf(tn)!==-1||String(it.desc||'').toUpperCase().indexOf(t.toUpperCase())!==-1||String(it.cat||'').toUpperCase().indexOf(t.toUpperCase())!==-1;
   });
   currentMatches=matches;
   if(matches.length===1){showResult(matches[0]);return;}
@@ -528,7 +756,7 @@ function search(q) {
 }
 
 /* ── Mostrar resultado ── */
-function showResult(item) {
+function showResult(item){
   resEl.innerHTML='';
   var card=document.createElement('div'); card.className='result-card';
   var fw=document.createElement('div'); fw.className='result-foto-wrap';
@@ -543,15 +771,28 @@ function showResult(item) {
   pb.innerHTML='<div class="price-label">'+(hasPromo(item)?'Precio promoción con IVA':'Precio final con IVA')+'</div><div class="price-val">'+ars(finalPrice(item))+'</div>'+ph+'<div class="price-note">'+(hasPromo(item)?'Precio promocional':'Precio de venta al público')+'</div>';
   card.appendChild(pb);
   if(item.exist!=null){var st=document.createElement('div');st.className='result-stock '+stockClass(item);st.innerHTML='<i class="ti ti-package"></i>'+esc(stockText(item));card.appendChild(st);}
+
+  // Botón agregar al carrito
+  var addBtn=document.createElement('button');
+  addBtn.className='add-to-cart-btn';
+  addBtn.innerHTML='<i class="ti ti-shopping-cart-plus"></i> Agregar al carrito';
+  addBtn.addEventListener('click',function(){ addToCart(item); });
+  card.appendChild(addBtn);
+
   resEl.appendChild(card); resEl.style.display='block';
   tsEl.textContent='Última consulta: '+new Date().toLocaleTimeString('es-AR');
   tsEl.style.display='block';
   resEl.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-/* ── Input manual ── */
+/* ── Input ── */
 inp.addEventListener('input',function(e){clearTimeout(debounceTimer);debounceTimer=setTimeout(function(){search(e.target.value);},150);});
 inp.addEventListener('keydown',function(e){if(e.key==='Enter'){clearTimeout(debounceTimer);search(inp.value);}if(e.key==='Escape')clearAll();});
+
+/* ── Spin animation ── */
+var style=document.createElement('style');
+style.textContent='@keyframes spin{to{transform:rotate(360deg)}}';
+document.head.appendChild(style);
 
 /* ── Carga de datos ── */
 fetch(API_URL)
