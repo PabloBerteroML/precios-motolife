@@ -137,6 +137,10 @@
   .modal-overlay {
     display:none; position:fixed; inset:0; z-index:200;
     background:rgba(0,0,0,.55); align-items:flex-end; justify-content:center;
+    touch-action:none;
+  }
+  .modal-overlay.open .modal-box {
+    touch-action:pan-y;
   }
   .modal-overlay.open { display:flex; }
   .modal-box {
@@ -144,6 +148,7 @@
     width:100%; max-width:680px; max-height:92vh;
     overflow-y:auto; padding:0 0 32px;
     box-shadow:0 -8px 40px rgba(0,0,0,.2);
+    -webkit-overflow-scrolling:touch;
   }
   .modal-header {
     position:sticky; top:0; z-index:10;
@@ -194,6 +199,9 @@
     padding:12px 14px; border:2px solid var(--border); border-radius:12px;
     font-size:15px; font-family:inherit; color:var(--black); background:#fff; outline:none;
     transition:border-color .15s;
+    position:relative; z-index:1;
+    -webkit-appearance:none;
+    touch-action:manipulation;
   }
   .form-input:focus { border-color:var(--orange); box-shadow:0 0 0 3px rgba(244,123,32,.15); }
   select.form-input { cursor:pointer; }
@@ -336,11 +344,15 @@
           <label class="form-label">Vendedor *</label>
           <select class="form-input" id="f-vendedor">
             <option value="">— Seleccioná —</option>
-            <option>Pablo</option>
-            <option>Nicolás</option>
-            <option>José</option>
-            <option>Pamela</option>
-            <option>Marcelo</option>
+            <option>NICOLAS BOSCAROL</option>
+            <option>JOSE ECHEVERRIA</option>
+            <option>PABLO BERTERO</option>
+            <option>MARCELO FRANCO</option>
+            <option>JOAQUIN FERREYRA</option>
+            <option>GONZALO LUCERO</option>
+            <option>YOEL GARCIA</option>
+            <option>MARIANO BIGONGIARI</option>
+            <option>GABRIEL MAURENZI</option>
           </select>
         </div>
         <div class="form-group">
