@@ -62,6 +62,19 @@
   #cam-status { padding:10px 16px; font-size:13px; color:var(--text3); background:var(--bg3); border-top:1px solid var(--border); text-align:center; }
   .scan-line { position:absolute; left:10%; right:10%; height:2px; background:var(--orange); opacity:0.8; animation:scanMove 2s linear infinite; box-shadow:0 0 6px var(--orange); }
   @keyframes scanMove { 0%{top:20%} 50%{top:75%} 100%{top:20%} }
+
+  /* ── Filtros de catálogo ── */
+  .filter-row { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .filter-select, .filter-toggle {
+    flex:1; min-width:220px; padding:12px 14px;
+    border:1px solid var(--border2); border-radius:12px;
+    background:#fff; color:var(--black); font-size:14px; font-weight:800;
+    outline:none;
+  }
+  .filter-select:focus { border-color:var(--orange); box-shadow:0 0 0 3px rgba(244,123,32,.12); }
+  .filter-toggle { display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
+  .filter-toggle input { accent-color:var(--orange); transform:scale(1.15); }
+  @media(max-width:640px){ .filter-select,.filter-toggle{min-width:100%;} }
   #sugs { margin-top:12px; border:1px solid var(--border); border-radius:18px; overflow:hidden; display:none; max-height:560px; overflow-y:auto; background:#fff; }
   .sort-bar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:8px; padding:12px; background:#fff; border-bottom:1px solid var(--border); }
   .sort-btn { border:1px solid var(--border2); background:#fff; color:var(--black); border-radius:999px; padding:8px 12px; font-size:12px; font-weight:900; cursor:pointer; }
@@ -291,6 +304,16 @@
       </button>
     </div>
 
+    <div class="filter-row">
+      <select id="cat-filter" class="filter-select">
+        <option value="">TODAS LAS CATEGORÍAS</option>
+      </select>
+      <label class="filter-toggle">
+        <input type="checkbox" id="stock-filter">
+        SOLO CON STOCK
+      </label>
+    </div>
+
     <div id="cam-wrap">
       <video id="cam-video" playsinline autoplay muted></video>
       <canvas id="cam-canvas" style="display:none"></canvas>
@@ -411,6 +434,8 @@ var camClose  = document.getElementById('cam-close');
 var camStatus = document.getElementById('cam-status');
 var videoEl   = document.getElementById('cam-video');
 var canvasEl  = document.getElementById('cam-canvas');
+var catFilter  = document.getElementById('cat-filter');
+var stockFilter = document.getElementById('stock-filter');
 var cartBar      = document.getElementById('cart-bar');
 var cartBadge    = document.getElementById('cart-count-badge');
 var cartBarText  = document.getElementById('cart-bar-text');
@@ -617,7 +642,7 @@ confirmBtn.addEventListener('click', function(){
 
 /* ── UI ── */
 function hideAll() { sugsEl.style.display='none'; resEl.style.display='none'; empEl.style.display='none'; }
-function clearAll() { inp.value=''; clrBtn.style.display='none'; currentMatches=[]; hideAll(); inp.focus(); }
+function clearAll() { inp.value=''; clrBtn.style.display='none'; currentMatches=[]; hideAll(); if (catFilter.value || stockFilter.checked) mostrarCatalogoFiltrado(); inp.focus(); }
 clrBtn.addEventListener('click', clearAll);
 
 /* ── Pistola ── */
@@ -758,15 +783,65 @@ function renderMatches(matches,t){
   });
 }
 
+
+/* ── Filtros de catálogo ── */
+function cargarCategorias() {
+  var cats = [];
+  var seen = {};
+  items.forEach(function(it){
+    var c = String(it.cat || '').trim();
+    if (c && !seen[c]) { seen[c] = true; cats.push(c); }
+  });
+  cats.sort(function(a,b){ return a.localeCompare(b,'es'); });
+  catFilter.innerHTML = '<option value="">TODAS LAS CATEGORÍAS</option>' +
+    cats.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
+}
+
+function aplicarFiltrosBase(arr) {
+  var cat = String(catFilter.value || '').trim();
+  var soloStock = !!stockFilter.checked;
+  return arr.filter(function(it){
+    if (cat && String(it.cat || '').trim() !== cat) return false;
+    if (soloStock && Number(it.exist || 0) <= 0) return false;
+    return true;
+  });
+}
+
+function mostrarCatalogoFiltrado() {
+  hideAll();
+  var matches = aplicarFiltrosBase(items);
+  currentMatches = matches;
+  if (matches.length > 0) {
+    renderMatches(matches, inp.value.trim());
+  } else {
+    empMsg.textContent = 'No hay artículos con esos filtros';
+    empEl.style.display = 'block';
+  }
+}
+
+catFilter.addEventListener('change', function(){
+  if (inp.value.trim()) search(inp.value); else mostrarCatalogoFiltrado();
+});
+stockFilter.addEventListener('change', function(){
+  if (inp.value.trim()) search(inp.value); else mostrarCatalogoFiltrado();
+});
+
 /* ── Búsqueda ── */
 function search(q){
   var t=q.trim(); hideAll();
-  if(!t){clrBtn.style.display='none';currentMatches=[];return;}
+  if(!t){
+    clrBtn.style.display='none';
+    if (catFilter.value || stockFilter.checked) { mostrarCatalogoFiltrado(); }
+    else { currentMatches=[]; }
+    return;
+  }
   clrBtn.style.display='flex';
   var tn=norm(t),exact=null;
-  for(var i=0;i<items.length;i++){if(norm(items[i].codigo)===tn){exact=items[i];break;}}
+  for(var i=0;i<items.length;i++){
+    if(norm(items[i].codigo)===tn && aplicarFiltrosBase([items[i]]).length){ exact=items[i]; break; }
+  }
   if(exact){currentMatches=[];showResult(exact);return;}
-  var matches=items.filter(function(it){
+  var matches=aplicarFiltrosBase(items).filter(function(it){
     return norm(it.codigo).indexOf(tn)!==-1||String(it.desc||'').toUpperCase().indexOf(t.toUpperCase())!==-1||String(it.cat||'').toUpperCase().indexOf(t.toUpperCase())!==-1;
   });
   currentMatches=matches;
@@ -824,6 +899,7 @@ function cargarItems(data) {
   statusEl.textContent = items.length.toLocaleString('es-AR') + ' artículos listos';
   dotEl.className = 'dot ok';
   inp.disabled = false;
+  cargarCategorias();
   inp.focus();
 }
 
