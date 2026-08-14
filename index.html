@@ -930,29 +930,19 @@ function fetchFresh() {
     });
 }
 
-// Intentar usar caché primero
+// Mostrar caché al instante si existe, pero SIEMPRE consultar Google Sheets
 (function() {
   var cached = null;
   try { cached = JSON.parse(localStorage.getItem(CACHE_KEY_LS)); } catch(e){}
 
-  if (cached && cached.data && (Date.now() - cached.ts) < CACHE_TTL_MS) {
-    // Caché fresco: mostrar al instante
+  // Si hay caché, usarlo sólo para mostrar datos rápidamente mientras llega la actualización
+  if (cached && cached.data) {
     cargarItems(cached.data);
-    // Refrescar en background silenciosamente cada vez que el caché tenga más de 30min
-    if ((Date.now() - cached.ts) > 30 * 60 * 1000) {
-      fetch(API_URL)
-        .then(function(r){ return r.ok ? r.json() : null; })
-        .then(function(data){
-          if (data) {
-            try { localStorage.setItem(CACHE_KEY_LS, JSON.stringify({ts:Date.now(),data:data})); } catch(e){}
-            items = Array.isArray(data) ? data : [];
-          }
-        }).catch(function(){});
-    }
-  } else {
-    // Sin caché o caché vencido: fetch normal
-    fetchFresh();
+    statusEl.textContent = items.length.toLocaleString('es-AR') + ' artículos · actualizando…';
   }
+
+  // Siempre buscar la versión más nueva de Google Sheets
+  fetchFresh();
 })();
 </script>
 </body>
