@@ -40,6 +40,16 @@
   .dot.err { background:var(--red); animation:none; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
   #status-text { font-size:14px; color:var(--text3); font-weight:500; }
+  #refresh-btn {
+    margin-left: auto;
+    background: none; border: none; cursor: pointer;
+    color: var(--orange); padding: 4px 8px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #refresh-btn:hover { background: var(--info-bg); }
+  #refresh-btn i { font-size: 20px; }
+  #refresh-btn.spinning i { animation: spin .8s linear infinite; }
+  #refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
   .search-wrap { position:relative; display:flex; align-items:center; gap:10px; }
   .search-input-wrap { position:relative; flex:1; }
   .s-icon { position:absolute; left:18px; top:50%; transform:translateY(-50%); font-size:27px; color:var(--orange); pointer-events:none; }
@@ -250,6 +260,8 @@
   mark { background:var(--warn-bg); color:var(--black); border-radius:3px; padding:0 3px; }
   footer { margin-top:28px; font-size:13px; color:var(--text3); text-align:center; }
 
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   @media(max-width:640px){
     body{padding:0 10px 34px;}
     header{padding:20px 0 14px;max-width:100%;}
@@ -287,6 +299,9 @@
     <div class="status-row">
       <span class="dot" id="dot"></span>
       <span id="status-text">Cargando artículos…</span>
+      <button id="refresh-btn" aria-label="Actualizar precios" title="Actualizar precios">
+        <i class="ti ti-refresh"></i>
+      </button>
     </div>
     <div class="search-wrap">
       <div class="search-input-wrap">
@@ -436,6 +451,7 @@ var videoEl   = document.getElementById('cam-video');
 var canvasEl  = document.getElementById('cam-canvas');
 var catFilter  = document.getElementById('cat-filter');
 var stockFilter = document.getElementById('stock-filter');
+var refreshBtn   = document.getElementById('refresh-btn');
 var cartBar      = document.getElementById('cart-bar');
 var cartBadge    = document.getElementById('cart-count-badge');
 var cartBarText  = document.getElementById('cart-bar-text');
@@ -885,10 +901,12 @@ function showResult(item){
 inp.addEventListener('input',function(e){clearTimeout(debounceTimer);debounceTimer=setTimeout(function(){search(e.target.value);},150);});
 inp.addEventListener('keydown',function(e){if(e.key==='Enter'){clearTimeout(debounceTimer);search(inp.value);}if(e.key==='Escape')clearAll();});
 
-/* ── Spin animation ── */
-var style=document.createElement('style');
-style.textContent='@keyframes spin{to{transform:rotate(360deg)}}';
-document.head.appendChild(style);
+/* ── Botón de recarga manual ── */
+refreshBtn.addEventListener('click', function(){
+  refreshBtn.disabled = true;
+  refreshBtn.classList.add('spinning');
+  fetchFresh();
+});
 
 /* ── Carga de datos con caché local ── */
 var CACHE_KEY_LS  = 'motolife_precios_v1';
@@ -915,6 +933,8 @@ function fetchFresh() {
         }));
       } catch(e) {}
       cargarItems(data);
+      if (inp.value.trim()) search(inp.value); // re-ejecuta la búsqueda activa con datos frescos
+      showToast('Precios actualizados');
     })
     .catch(function(err){
       // Si hay caché viejo, usarlo igual con aviso
@@ -927,6 +947,11 @@ function fetchFresh() {
         statusEl.textContent = 'Error al cargar: ' + err.message;
         dotEl.className = 'dot err';
       }
+      showToast('Error al actualizar', true);
+    })
+    .finally(function(){
+      refreshBtn.disabled = false;
+      refreshBtn.classList.remove('spinning');
     });
 }
 
