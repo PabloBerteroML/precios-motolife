@@ -854,11 +854,11 @@ function search(q){
   clrBtn.style.display='flex';
   var tn=norm(t),exact=null;
   for(var i=0;i<items.length;i++){
-    if(norm(items[i].codigo)===tn && aplicarFiltrosBase([items[i]]).length){ exact=items[i]; break; }
+    if((norm(items[i].codigo)===tn || (items[i].codigoImportadora && norm(items[i].codigoImportadora)===tn)) && aplicarFiltrosBase([items[i]]).length){ exact=items[i]; break; }
   }
   if(exact){currentMatches=[];showResult(exact);return;}
   var matches=aplicarFiltrosBase(items).filter(function(it){
-    return norm(it.codigo).indexOf(tn)!==-1||String(it.desc||'').toUpperCase().indexOf(t.toUpperCase())!==-1||String(it.cat||'').toUpperCase().indexOf(t.toUpperCase())!==-1;
+    return norm(it.codigo).indexOf(tn)!==-1|| (it.codigoImportadora && norm(it.codigoImportadora).indexOf(tn)!==-1) ||String(it.desc||'').toUpperCase().indexOf(t.toUpperCase())!==-1||String(it.cat||'').toUpperCase().indexOf(t.toUpperCase())!==-1;
   });
   currentMatches=matches;
   if(matches.length===1){showResult(matches[0]);return;}
@@ -909,7 +909,7 @@ refreshBtn.addEventListener('click', function(){
 });
 
 /* ── Carga de datos con caché local ── */
-var CACHE_KEY_LS  = 'motolife_precios_v1';
+var CACHE_KEY_LS  = 'motolife_precios_v2';
 var CACHE_TTL_MS  = 4 * 60 * 60 * 1000; // 4 horas en ms
 
 function cargarItems(data) {
